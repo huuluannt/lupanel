@@ -694,6 +694,71 @@ input, textarea {
   color: #ef4444;
 }
 
+.youtube-component-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.youtube-editor {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background-color: var(--bg-hover);
+}
+
+.youtube-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: inherit;
+}
+
+.youtube-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.youtube-error {
+  font-size: 11px;
+  color: #ef4444;
+}
+
+.youtube-preview {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.youtube-edit-btn-inline {
+  position: absolute;
+  right: 0;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background-color: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 8px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.youtube-edit-btn-inline:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+}
+
 .component-controls {
   position: absolute;
   left: 0;

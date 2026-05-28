@@ -125,7 +125,7 @@ export default function PanelPage({ params }: PageProps) {
     }
   };
 
-  const handleAddComponent = async (type: "title" | "text" | "image" | "url") => {
+  const handleAddComponent = async (type: "title" | "text" | "image" | "url" | "youtube") => {
     const newComp: PanelComponent = {
       id: `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       type,
