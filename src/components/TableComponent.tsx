@@ -92,7 +92,7 @@ const getColumnLabel = (index: number) => {
   return label;
 };
 
-const Icon = ({ type }: { type: "plus" | "trash" | "left" | "right" | "up" | "down" }) => {
+const Icon = ({ type }: { type: "trash" | "left" | "right" | "up" | "down" }) => {
   if (type === "trash") {
     return (
       <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -104,12 +104,6 @@ const Icon = ({ type }: { type: "plus" | "trash" | "left" | "right" | "up" | "do
   }
 
   const paths = {
-    plus: (
-      <>
-        <path d="M8 3.5v9" />
-        <path d="M3.5 8h9" />
-      </>
-    ),
     left: <path d="M9.8 4.2 6 8l3.8 3.8" />,
     right: <path d="M6.2 4.2 10 8l-3.8 3.8" />,
     up: <path d="M4.2 9.8 8 6l3.8 3.8" />,
@@ -122,6 +116,7 @@ const Icon = ({ type }: { type: "plus" | "trash" | "left" | "right" | "up" | "do
 const TableComponent = ({ value, onChange }: TableComponentProps) => {
   const [tableData, setTableData] = useState<TableData>(() => normalizeTableData(value));
   const lastPublishedValue = useRef(value);
+  const scrollShellRef = useRef<HTMLDivElement>(null);
   const resizingState = useRef<{
     type: "col" | "row";
     index: number;
@@ -157,6 +152,17 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
     }),
     [tableData.colWidths]
   );
+
+  const handleHorizontalWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    const shell = scrollShellRef.current;
+    if (!shell || shell.scrollWidth <= shell.clientWidth) return;
+
+    const horizontalDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (horizontalDelta === 0) return;
+
+    event.preventDefault();
+    shell.scrollLeft += horizontalDelta;
+  };
 
   const updateCellValue = (rowIndex: number, colIndex: number, text: string) => {
     setTableData((current) => {
@@ -292,24 +298,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
 
   return (
     <div className="table-component-wrapper">
-      <div className="table-component-topbar">
-        <div className="table-component-title">
-          <span>Table</span>
-          <span className="table-component-meta">{rowCount} × {colCount}</span>
-        </div>
-        <div className="table-component-actions">
-          <button type="button" className="table-action-btn" onClick={() => addRowAt(rowCount)}>
-            <Icon type="plus" />
-            Row
-          </button>
-          <button type="button" className="table-action-btn" onClick={() => addColAt(colCount)}>
-            <Icon type="plus" />
-            Column
-          </button>
-        </div>
-      </div>
-
-      <div className="table-scroll-shell">
+      <div className="table-scroll-shell" ref={scrollShellRef} onWheel={handleHorizontalWheel}>
         <div className="table-grid" style={tableGridStyle}>
           <div className="table-corner-cell" aria-hidden="true" />
 
