@@ -4,7 +4,6 @@ import {
   doc, 
   getDocs, 
   getDoc, 
-  setDoc, 
   query, 
   orderBy, 
   writeBatch 
@@ -18,7 +17,7 @@ export interface Panel {
 
 export interface PanelComponent {
   id: string;
-  type: "title" | "text" | "image" | "url" | "youtube" | "table";
+  type: "title" | "text" | "richtext" | "image" | "url" | "youtube" | "table" | "gallery";
   value: string; // Text string, URL string, base64/remote image URL, or JSON for complex component state
   order: number;
 }
@@ -57,6 +56,25 @@ export const slugify = (text: string): string => {
     .replace(/\s+/g, "-") // Replace spaces with -
     .replace(/[^\w\-]+/g, "") // Remove all non-word chars
     .replace(/\-\-+/g, "-"); // Replace multiple - with single -
+};
+
+const createDefaultPanelComponents = (): PanelComponent[] => {
+  const timestamp = Date.now();
+
+  return [
+    {
+      id: `title-${timestamp}`,
+      type: "title",
+      value: "",
+      order: 0,
+    },
+    {
+      id: `text-${timestamp}`,
+      type: "text",
+      value: "",
+      order: 1,
+    },
+  ];
 };
 
 // Unified storage provider
@@ -106,13 +124,21 @@ export const storageProvider = {
 
     if (isFirebaseConfigured() && db) {
       try {
-        const docRef = doc(db, "panels", id);
+        const firestore = db;
+        const docRef = doc(firestore, "panels", id);
         // Check if panel already exists
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           return null; // Panel already exists
         }
-        await setDoc(docRef, newPanel);
+        const batch = writeBatch(db);
+        batch.set(docRef, newPanel);
+
+        createDefaultPanelComponents().forEach((component) => {
+          batch.set(doc(firestore, "panels", id, "components", component.id), component);
+        });
+
+        await batch.commit();
         return newPanel;
       } catch (e) {
         console.error("Firebase createPanel failed", e);
@@ -129,6 +155,7 @@ export const storageProvider = {
       }
       list.push(newPanel);
       localStorage.setItem("lupanel_panels", JSON.stringify(list));
+      localStorage.setItem(`lupanel_components_${id}`, JSON.stringify(createDefaultPanelComponents()));
       return newPanel;
     }
 

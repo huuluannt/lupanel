@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { PanelComponent } from "../lib/storage";
 import TitleComponent from "./TitleComponent";
 import TextComponent from "./TextComponent";
+import RichTextComponent from "./RichTextComponent";
 import ImageComponent from "./ImageComponent";
+import GalleryComponent from "./GalleryComponent";
 import UrlComponent from "./UrlComponent";
 import YoutubeComponent from "./YoutubeComponent";
 import TableComponent from "./TableComponent";
@@ -28,6 +30,7 @@ export default function ComponentList({
 }: ComponentListProps) {
   // To allow smooth focus jumping
   const componentRefs = useRef<Record<string, { focus?: () => void } | null>>({});
+  const [pendingDeleteComponent, setPendingDeleteComponent] = useState<PanelComponent | null>(null);
 
   const handleFocusNext = (currentIndex: number) => {
     if (currentIndex + 1 < components.length) {
@@ -95,8 +98,23 @@ export default function ComponentList({
                 />
               )}
 
+              {comp.type === "richtext" && (
+                <RichTextComponent
+                  value={comp.value}
+                  onChange={(val) => onComponentChange(comp.id, val)}
+                />
+              )}
+
               {comp.type === "image" && (
                 <ImageComponent
+                  value={comp.value}
+                  onChange={(val) => onComponentChange(comp.id, val)}
+                  onUploadImage={onUploadImage}
+                />
+              )}
+
+              {comp.type === "gallery" && (
+                <GalleryComponent
                   value={comp.value}
                   onChange={(val) => onComponentChange(comp.id, val)}
                   onUploadImage={onUploadImage}
@@ -126,7 +144,7 @@ export default function ComponentList({
 
               <button
                 className="component-delete-btn"
-                onClick={() => onDeleteComponent(comp.id)}
+                onClick={() => setPendingDeleteComponent(comp)}
                 title="Xóa thành phần"
               >
                 ×
@@ -135,6 +153,36 @@ export default function ComponentList({
           </div>
         );
       })}
+
+      {pendingDeleteComponent && (
+        <div className="component-confirm-backdrop" role="dialog" aria-modal="true">
+          <div className="component-confirm-modal">
+            <div className="component-confirm-title">Xoa component nay?</div>
+            <div className="component-confirm-desc">
+              Noi dung trong component se bi xoa khoi panel.
+            </div>
+            <div className="component-confirm-actions">
+              <button
+                type="button"
+                className="component-confirm-secondary"
+                onClick={() => setPendingDeleteComponent(null)}
+              >
+                Huy
+              </button>
+              <button
+                type="button"
+                className="component-confirm-danger"
+                onClick={() => {
+                  onDeleteComponent(pendingDeleteComponent.id);
+                  setPendingDeleteComponent(null);
+                }}
+              >
+                Xoa component
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

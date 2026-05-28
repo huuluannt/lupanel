@@ -19,6 +19,20 @@ interface PageProps {
   params: Promise<{ panelId: string }>;
 }
 
+type ComponentType = PanelComponent["type"];
+
+const getDefaultComponentValue = (type: ComponentType) => {
+  if (type === "table") {
+    return JSON.stringify({ rows: [ ["", ""], ["", ""] ], colWidths: [220, 220], rowHeights: [30, 30] });
+  }
+
+  if (type === "gallery") {
+    return JSON.stringify({ images: [] });
+  }
+
+  return "";
+};
+
 export default function PanelPage({ params }: PageProps) {
   const { panelId } = use(params);
 
@@ -125,11 +139,11 @@ export default function PanelPage({ params }: PageProps) {
     }
   };
 
-  const handleAddComponent = async (type: "title" | "text" | "image" | "url" | "youtube" | "table") => {
+  const handleAddComponent = async (type: ComponentType) => {
     const newComp: PanelComponent = {
       id: `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       type,
-      value: type === "table" ? JSON.stringify({ rows: [ ["", ""], ["", ""] ], colWidths: [220, 220], rowHeights: [80, 80] }) : "",
+      value: getDefaultComponentValue(type),
       order: components.length > 0 ? Math.max(...components.map((item) => item.order)) + 1 : 0,
     };
 

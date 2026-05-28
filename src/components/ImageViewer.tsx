@@ -1,56 +1,125 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+export interface ViewerImage {
+  src: string;
+  caption?: string;
+}
 
 interface ImageViewerProps {
   src: string;
   onClose: () => void;
+  items?: ViewerImage[];
+  initialIndex?: number;
 }
 
-export default function ImageViewer({ src, onClose }: ImageViewerProps) {
+const clampIndex = (index: number, length: number) => {
+  if (length <= 0) return 0;
+  return Math.min(Math.max(index, 0), length - 1);
+};
+
+export default function ImageViewer({
+  src,
+  onClose,
+  items,
+  initialIndex = 0,
+}: ImageViewerProps) {
+  const imageItems = useMemo<ViewerImage[]>(() => {
+    return items?.length ? items : [{ src }];
+  }, [items, src]);
+
+  const [currentIndex, setCurrentIndex] = useState(() => clampIndex(initialIndex, imageItems.length));
+  const [slideDirection, setSlideDirection] = useState<"next" | "prev" | "none">("none");
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const translateAtDragStart = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const clickStartPos = useRef<{ x: number; y: number } | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const touchLatest = useRef<{ x: number; y: number } | null>(null);
 
-  // Close on ESC
+  const currentImage = imageItems[currentIndex] ?? { src };
+  const canNavigate = imageItems.length > 1;
+
+  const resetView = useCallback(() => {
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+    setIsDragging(false);
+    dragStart.current = null;
+  }, []);
+
+  const goToIndex = useCallback(
+    (targetIndex: number, direction: "next" | "prev") => {
+      if (!canNavigate) return;
+      const wrappedIndex = (targetIndex + imageItems.length) % imageItems.length;
+      setSlideDirection(direction);
+      setCurrentIndex(wrappedIndex);
+      resetView();
+    },
+    [canNavigate, imageItems.length, resetView]
+  );
+
+  const goPrevious = useCallback(() => {
+    goToIndex(currentIndex - 1, "prev");
+  }, [currentIndex, goToIndex]);
+
+  const goNext = useCallback(() => {
+    goToIndex(currentIndex + 1, "next");
+  }, [currentIndex, goToIndex]);
+
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      if (!canNavigate) return;
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        goPrevious();
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        goNext();
+      }
     };
+
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+  }, [canNavigate, goNext, goPrevious, onClose]);
 
-  // Prevent body scroll while open
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, []);
 
-  // Zoom with mouse wheel
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setScale((s) => Math.min(Math.max(s * delta, 0.2), 8));
+  const handleWheel = useCallback((event: React.WheelEvent) => {
+    event.preventDefault();
+    const delta = event.deltaY > 0 ? 0.9 : 1.1;
+    setScale((currentScale) => Math.min(Math.max(currentScale * delta, 0.2), 8));
   }, []);
 
-  // Pan: mouse down
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
+  const handleMouseDown = (event: React.MouseEvent) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
     setIsDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY };
+    dragStart.current = { x: event.clientX, y: event.clientY };
     translateAtDragStart.current = { ...translate };
   };
 
-  // Pan: mouse move
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (event: React.MouseEvent) => {
     if (!isDragging || !dragStart.current) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
+    const dx = event.clientX - dragStart.current.x;
+    const dy = event.clientY - dragStart.current.y;
     setTranslate({
       x: translateAtDragStart.current.x + dx,
       y: translateAtDragStart.current.y + dy,
@@ -62,156 +131,199 @@ export default function ImageViewer({ src, onClose }: ImageViewerProps) {
     dragStart.current = null;
   };
 
-  // Touch support for mobile pan
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  const handleTouchStart = (event: React.TouchEvent) => {
+    if (event.touches.length !== 1) return;
+    const point = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    touchStart.current = point;
+    touchLatest.current = point;
     translateAtDragStart.current = { ...translate };
   };
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1 || !touchStart.current) return;
-    const dx = e.touches[0].clientX - touchStart.current.x;
-    const dy = e.touches[0].clientY - touchStart.current.y;
+
+  const handleTouchMove = (event: React.TouchEvent) => {
+    if (event.touches.length !== 1 || !touchStart.current) return;
+    const point = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    touchLatest.current = point;
+
+    if (scale <= 1.05) return;
+
+    const dx = point.x - touchStart.current.x;
+    const dy = point.y - touchStart.current.y;
     setTranslate({
       x: translateAtDragStart.current.x + dx,
       y: translateAtDragStart.current.y + dy,
     });
   };
 
-  const handleZoomIn = () => setScale((s) => Math.min(s * 1.3, 8));
-  const handleZoomOut = () => setScale((s) => Math.max(s * 0.77, 0.2));
-  const handleReset = () => { setScale(1); setTranslate({ x: 0, y: 0 }); };
+  const handleTouchEnd = () => {
+    if (!touchStart.current || !touchLatest.current || !canNavigate || scale > 1.05) {
+      touchStart.current = null;
+      touchLatest.current = null;
+      return;
+    }
+
+    const dx = touchLatest.current.x - touchStart.current.x;
+    const dy = touchLatest.current.y - touchStart.current.y;
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.35) {
+      if (dx > 0) {
+        goPrevious();
+      } else {
+        goNext();
+      }
+    }
+
+    touchStart.current = null;
+    touchLatest.current = null;
+  };
+
+  const handleZoomIn = () => setScale((currentScale) => Math.min(currentScale * 1.3, 8));
+  const handleZoomOut = () => setScale((currentScale) => Math.max(currentScale * 0.77, 0.2));
 
   const handleDownload = () => {
-    const a = document.createElement("a");
-    a.href = src;
-    a.download = `image-${Date.now()}.png`;
-    a.click();
+    const link = document.createElement("a");
+    link.href = currentImage.src;
+    link.download = `image-${Date.now()}.png`;
+    link.click();
   };
 
-  // Click on backdrop closes viewer (but not when panning)
-  const clickStartPos = useRef<{ x: number; y: number } | null>(null);
-  const handleBackdropMouseDown = (e: React.MouseEvent) => {
-    clickStartPos.current = { x: e.clientX, y: e.clientY };
+  const handleBackdropMouseDown = (event: React.MouseEvent) => {
+    clickStartPos.current = { x: event.clientX, y: event.clientY };
   };
-  const handleBackdropClick = (e: React.MouseEvent) => {
+
+  const handleBackdropClick = () => {
     if (!clickStartPos.current) return;
-    const dx = Math.abs(e.clientX - clickStartPos.current.x);
-    const dy = Math.abs(e.clientY - clickStartPos.current.y);
-    if (dx < 4 && dy < 4) onClose();
+    onClose();
+  };
+
+  const handleCanvasClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!clickStartPos.current) return;
+    const dx = Math.abs(event.clientX - clickStartPos.current.x);
+    const dy = Math.abs(event.clientY - clickStartPos.current.y);
+    if (dx >= 4 || dy >= 4) return;
   };
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 99999,
-        backgroundColor: "rgba(0,0,0,0.85)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+      className="image-viewer-backdrop"
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
     >
-      {/* Toolbar */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "48px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: "4px",
-          padding: "0 16px",
-          zIndex: 100000,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Zoom out */}
-        <button style={toolbarBtnStyle} onClick={handleZoomOut} title="Thu nhỏ (-)">
+      <div className="image-viewer-toolbar" onClick={(event) => event.stopPropagation()}>
+        {canNavigate && (
+          <button className="image-viewer-count" type="button" title="Image count">
+            {currentIndex + 1}/{imageItems.length}
+          </button>
+        )}
+
+        <button style={toolbarBtnStyle} onClick={handleZoomOut} title="Zoom out">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            <line x1="8" y1="11" x2="14" y2="11"/>
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="8" y1="11" x2="14" y2="11" />
           </svg>
         </button>
 
-        {/* Zoom level label */}
-        <button style={{ ...toolbarBtnStyle, minWidth: "46px", fontSize: "11px", cursor: "default" }} onClick={handleReset} title="Reset zoom">
+        <button style={{ ...toolbarBtnStyle, minWidth: "46px", width: "46px", fontSize: "11px" }} onClick={resetView} title="Reset zoom">
           {Math.round(scale * 100)}%
         </button>
 
-        {/* Zoom in */}
-        <button style={toolbarBtnStyle} onClick={handleZoomIn} title="Phóng to (+)">
+        <button style={toolbarBtnStyle} onClick={handleZoomIn} title="Zoom in">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="11" y1="8" x2="11" y2="14" />
+            <line x1="8" y1="11" x2="14" y2="11" />
           </svg>
         </button>
 
-        <div style={{ width: "1px", height: "18px", backgroundColor: "rgba(255,255,255,0.2)", margin: "0 6px" }} />
+        <div className="image-viewer-divider" />
 
-        {/* Download */}
-        <button style={toolbarBtnStyle} onClick={handleDownload} title="Tải ảnh về">
+        <button style={toolbarBtnStyle} onClick={handleDownload} title="Download image">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
         </button>
 
-        <div style={{ width: "1px", height: "18px", backgroundColor: "rgba(255,255,255,0.2)", margin: "0 6px" }} />
+        <div className="image-viewer-divider" />
 
-        {/* Close */}
-        <button style={toolbarBtnStyle} onClick={onClose} title="Đóng (ESC)">
+        <button style={toolbarBtnStyle} onClick={onClose} title="Close">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
       </div>
 
-      {/* Image canvas */}
+      {canNavigate && (
+        <>
+          <button
+            type="button"
+            className="image-viewer-nav image-viewer-nav-prev"
+            onClick={(event) => {
+              event.stopPropagation();
+              goPrevious();
+            }}
+            title="Previous image"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="image-viewer-nav image-viewer-nav-next"
+            onClick={(event) => {
+              event.stopPropagation();
+              goNext();
+            }}
+            title="Next image"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </>
+      )}
+
       <div
         ref={containerRef}
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-          cursor: isDragging ? "grabbing" : "grab",
-        }}
+        className={`image-viewer-canvas ${isDragging ? "is-dragging" : ""}`}
         onWheel={handleWheel}
-        onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e); }}
+        onMouseDown={(event) => {
+          event.stopPropagation();
+          handleMouseDown(event);
+        }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onClick={(e) => e.stopPropagation()}
+        onTouchEnd={handleTouchEnd}
+        onClick={handleCanvasClick}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={src}
-          alt="Preview"
+          key={`${currentImage.src}-${currentIndex}`}
+          src={currentImage.src}
+          alt={currentImage.caption || "Preview"}
           draggable={false}
+          className={`image-viewer-img ${
+            slideDirection === "prev" ? "image-viewer-img-prev" : "image-viewer-img-next"
+          }`}
           style={{
-            maxWidth: "90vw",
-            maxHeight: "85vh",
-            objectFit: "contain",
             transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-            transformOrigin: "center center",
             transition: isDragging ? "none" : "transform 0.08s ease-out",
-            userSelect: "none",
-            borderRadius: "4px",
           }}
         />
       </div>
+
+      {currentImage.caption && (
+        <div className="image-viewer-caption" onClick={(event) => event.stopPropagation()}>
+          {currentImage.caption}
+        </div>
+      )}
     </div>
   );
 }

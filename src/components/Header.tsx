@@ -19,7 +19,7 @@ interface HeaderProps {
   searchValue?: string;
   onSearchChange?: (val: string) => void;
   // Panel mode functions
-  onAddComponent?: (type: "title" | "text" | "image" | "url" | "youtube" | "table") => void;
+  onAddComponent?: (type: "title" | "text" | "richtext" | "image" | "url" | "youtube" | "table" | "gallery") => void;
 }
 
 export default function Header({
@@ -153,6 +153,21 @@ export default function Header({
                 <button
                   className="dropdown-item"
                   onClick={() => {
+                    onAddComponent("richtext");
+                    setShowComponentMenu(false);
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 7h16" />
+                    <path d="M4 12h10" />
+                    <path d="M4 17h8" />
+                    <path d="M17 14l3 3-3 3" />
+                  </svg>
+                  Rich Text
+                </button>
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
                     onAddComponent("url");
                     setShowComponentMenu(false);
                   }}
@@ -191,6 +206,22 @@ export default function Header({
                     <polyline points="21 15 16 10 5 21"></polyline>
                   </svg>
                   Image
+                </button>
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    onAddComponent("gallery");
+                    setShowComponentMenu(false);
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    <path d="M17.5 14v7" />
+                    <path d="M14 17.5h7" />
+                  </svg>
+                  Gallery
                 </button>
                 <button
                   className="dropdown-item"

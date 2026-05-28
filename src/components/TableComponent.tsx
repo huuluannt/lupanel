@@ -14,11 +14,11 @@ interface TableComponentProps {
 }
 
 const DEFAULT_COL_WIDTH = 144;
-const DEFAULT_ROW_HEIGHT = 42;
+const DEFAULT_ROW_HEIGHT = 30;
 const DEFAULT_ROWS = 2;
 const DEFAULT_COLS = 2;
 const MIN_COL_WIDTH = 84;
-const MIN_ROW_HEIGHT = 34;
+const MIN_ROW_HEIGHT = 28;
 const ROW_HEADER_WIDTH = 34;
 
 const createEmptyRows = (rows: number, cols: number): string[][] => {
