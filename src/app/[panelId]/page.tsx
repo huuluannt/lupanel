@@ -125,7 +125,7 @@ export default function PanelPage({ params }: PageProps) {
     }
   };
 
-  const handleAddComponent = async (type: "title" | "text" | "image") => {
+  const handleAddComponent = async (type: "title" | "text" | "image" | "url") => {
     const newComp: PanelComponent = {
       id: `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       type,
@@ -149,6 +149,25 @@ export default function PanelPage({ params }: PageProps) {
 
   const handleDeleteComponent = async (id: string) => {
     await saveComponents(components.filter((component) => component.id !== id));
+  };
+
+  const handleMoveComponent = async (id: string, direction: "up" | "down") => {
+    const currentIndex = components.findIndex((component) => component.id === id);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= components.length) return;
+
+    const nextComponents = [...components];
+    const [moved] = nextComponents.splice(currentIndex, 1);
+    nextComponents.splice(targetIndex, 0, moved);
+
+    const orderedComponents = nextComponents.map((component, index) => ({
+      ...component,
+      order: index,
+    }));
+
+    await saveComponents(orderedComponents);
   };
 
   const handleUploadImage = async (file: File): Promise<string> => {
@@ -209,6 +228,8 @@ export default function PanelPage({ params }: PageProps) {
           components={components}
           onComponentChange={handleComponentChange}
           onDeleteComponent={handleDeleteComponent}
+          onMoveComponentUp={(id) => void handleMoveComponent(id, "up")}
+          onMoveComponentDown={(id) => void handleMoveComponent(id, "down")}
           onUploadImage={handleUploadImage}
         />
       </main>

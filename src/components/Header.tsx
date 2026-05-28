@@ -19,7 +19,7 @@ interface HeaderProps {
   searchValue?: string;
   onSearchChange?: (val: string) => void;
   // Panel mode functions
-  onAddComponent?: (type: "title" | "text" | "image") => void;
+  onAddComponent?: (type: "title" | "text" | "image" | "url") => void;
 }
 
 export default function Header({
@@ -149,6 +149,19 @@ export default function Header({
                     <line x1="16" y1="3" x2="14" y2="21"></line>
                   </svg>
                   Text
+                </button>
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    onAddComponent("url");
+                    setShowComponentMenu(false);
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M10 6h4a4 4 0 0 1 4 4v4a4 4 0 0 1-4 4h-4" />
+                    <path d="M14 18h-4a4 4 0 0 1-4-4v-4a4 4 0 0 1 4-4h4" />
+                  </svg>
+                  URL
                 </button>
                 <button
                   className="dropdown-item"

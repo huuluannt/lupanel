@@ -18,8 +18,8 @@ export interface Panel {
 
 export interface PanelComponent {
   id: string;
-  type: "title" | "text" | "image";
-  value: string; // Text string or base64/remote image URL
+  type: "title" | "text" | "image" | "url";
+  value: string; // Text string, URL string, or base64/remote image URL
   order: number;
 }
 

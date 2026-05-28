@@ -5,11 +5,14 @@ import { PanelComponent } from "../lib/storage";
 import TitleComponent from "./TitleComponent";
 import TextComponent from "./TextComponent";
 import ImageComponent from "./ImageComponent";
+import UrlComponent from "./UrlComponent";
 
 interface ComponentListProps {
   components: PanelComponent[];
   onComponentChange: (id: string, value: string) => void;
   onDeleteComponent: (id: string) => void;
+  onMoveComponentUp: (id: string) => void;
+  onMoveComponentDown: (id: string) => void;
   onUploadImage: (file: File) => Promise<string>;
 }
 
@@ -17,6 +20,8 @@ export default function ComponentList({
   components,
   onComponentChange,
   onDeleteComponent,
+  onMoveComponentUp,
+  onMoveComponentDown,
   onUploadImage,
 }: ComponentListProps) {
   // To allow smooth focus jumping
@@ -46,22 +51,32 @@ export default function ComponentList({
       {components.map((comp, idx) => {
         return (
           <div key={comp.id} className="component-row">
-            {/* Minimal drag/delete hover actions on the left */}
+            {/* Minimal drag actions on the left */}
             <div className="component-controls">
-              <button 
-                className="component-control-btn" 
-                onClick={() => onDeleteComponent(comp.id)}
-                title="Xóa thành phần"
+              <button
+                className="component-control-btn"
+                onClick={() => onMoveComponentUp(comp.id)}
+                title="Di chuyển lên"
+                disabled={idx === 0}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                  <path d="M6 15l6-6 6 6" />
+                </svg>
+              </button>
+              <button
+                className="component-control-btn"
+                onClick={() => onMoveComponentDown(comp.id)}
+                title="Di chuyển xuống"
+                disabled={idx === components.length - 1}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 9l6 6 6-6" />
                 </svg>
               </button>
             </div>
 
             {/* Component Content rendering */}
-            <div style={{ width: "100%" }}>
+            <div className="component-content-wrapper">
               {comp.type === "title" && (
                 <TitleComponent
                   value={comp.value}
@@ -85,6 +100,21 @@ export default function ComponentList({
                   onUploadImage={onUploadImage}
                 />
               )}
+
+              {comp.type === "url" && (
+                <UrlComponent
+                  value={comp.value}
+                  onChange={(val) => onComponentChange(comp.id, val)}
+                />
+              )}
+
+              <button
+                className="component-delete-btn"
+                onClick={() => onDeleteComponent(comp.id)}
+                title="Xóa thành phần"
+              >
+                ×
+              </button>
             </div>
           </div>
         );
