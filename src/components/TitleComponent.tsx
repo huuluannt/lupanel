@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface TitleComponentProps {
   value: string;
@@ -17,11 +17,6 @@ export default function TitleComponent({
 }: TitleComponentProps) {
   const [localValue, setLocalValue] = useState(value);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Sync with prop changes
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;

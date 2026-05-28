@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface TextComponentProps {
   value: string;
@@ -27,11 +27,6 @@ export default function TextComponent({
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
   };
-
-  // Sync with prop changes and adjust height
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
 
   useEffect(() => {
     adjustHeight();

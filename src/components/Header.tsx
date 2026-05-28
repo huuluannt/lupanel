@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 interface UserProfile {
   email: string;
@@ -33,7 +32,6 @@ export default function Header({
   onSearchChange,
   onAddComponent,
 }: HeaderProps) {
-  const router = useRouter();
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showComponentMenu, setShowComponentMenu] = useState(false);
   

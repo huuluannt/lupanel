@@ -35,4 +35,6 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
-This repository includes `vercel.json` so deployments use the Next.js framework preset and `.next` build output. If Vercel still reports `No Output Directory named "dist"`, reset the Project Settings output directory override or let this `vercel.json` override take effect on the next pushed deployment.
+This repository includes `vercel.json` so deployments use the Next.js framework preset and clear any incorrect `dist` output-directory override. If Vercel still reports `No Output Directory named "dist"`, reset the Project Settings output directory override and redeploy.
+
+For live panel creation on `lupanel.vercel.app`, make sure Vercel has all `NEXT_PUBLIC_FIREBASE_*` variables from `.env.example`, Firebase Authentication includes `lupanel.vercel.app` in Authorized domains, and Firestore rules allow the signed-in owner account to read/write `panels` and `panels/{panelId}/components`.

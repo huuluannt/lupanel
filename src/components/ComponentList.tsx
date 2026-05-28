@@ -20,7 +20,7 @@ export default function ComponentList({
   onUploadImage,
 }: ComponentListProps) {
   // To allow smooth focus jumping
-  const componentRefs = useRef<{ [key: string]: any }>({});
+  const componentRefs = useRef<Record<string, { focus?: () => void } | null>>({});
 
   const handleFocusNext = (currentIndex: number) => {
     if (currentIndex + 1 < components.length) {

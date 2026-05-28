@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import LoginScreen from "../components/LoginScreen";
-import { storageProvider, Panel } from "../lib/storage";
-import { isFirebaseConfigured, auth } from "../lib/firebase";
+import { Panel, storageProvider } from "../lib/storage";
+import { auth, isFirebaseConfigured } from "../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 interface UserProfile {
@@ -16,20 +16,47 @@ interface UserProfile {
 
 export default function Home() {
   const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  
-  // Dashboard state
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    if (isFirebaseConfigured() || typeof window === "undefined") return null;
+    const cachedUser = localStorage.getItem("lupanel_user");
+    if (!cachedUser) return null;
+    try {
+      return JSON.parse(cachedUser) as UserProfile;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => isFirebaseConfigured());
+
   const [panels, setPanels] = useState<Panel[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [newPanelName, setNewPanelName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
+  const [panelListError, setPanelListError] = useState<string | null>(null);
 
-  // Authentication sync
+  const fetchPanels = useCallback(async () => {
+    try {
+      setPanelListError(null);
+      const list = await storageProvider.getPanels();
+      setPanels(list);
+    } catch (error) {
+      console.error(error);
+      setPanelListError(
+        "Không thể tải danh sách panel. Hãy kiểm tra Firebase env và Firestore rules trên Vercel."
+      );
+      setPanels([]);
+    }
+  }, []);
+
   useEffect(() => {
+    const loadingFallback = window.setTimeout(() => {
+      setLoading(false);
+    }, 8000);
+
     if (isFirebaseConfigured() && auth) {
       const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        window.clearTimeout(loadingFallback);
         if (firebaseUser && firebaseUser.email === "huuluannt@gmail.com") {
           setUser({
             email: firebaseUser.email,
@@ -41,32 +68,26 @@ export default function Home() {
         }
         setLoading(false);
       });
-      return () => unsubscribe();
-    } else {
-      // Demo / Local Mode Session
-      if (typeof window !== "undefined") {
-        const cachedUser = localStorage.getItem("lupanel_user");
-        if (cachedUser) {
-          try {
-            setUser(JSON.parse(cachedUser) as UserProfile);
-          } catch {}
-        }
-      }
-      setLoading(false);
+      return () => {
+        window.clearTimeout(loadingFallback);
+        unsubscribe();
+      };
     }
+
+    if (isFirebaseConfigured() && !auth) {
+      queueMicrotask(() => setLoading(false));
+    }
+
+    return () => window.clearTimeout(loadingFallback);
   }, []);
 
-  // Fetch panels list
   useEffect(() => {
     if (user) {
-      fetchPanels();
+      queueMicrotask(() => {
+        void fetchPanels();
+      });
     }
-  }, [user]);
-
-  const fetchPanels = async () => {
-    const list = await storageProvider.getPanels();
-    setPanels(list);
-  };
+  }, [fetchPanels, user]);
 
   const handleLoginSuccess = (profile: UserProfile) => {
     setUser(profile);
@@ -88,42 +109,52 @@ export default function Home() {
   const handleAddPanel = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError(null);
-    
+
     const trimmedName = newPanelName.trim();
     if (!trimmedName) {
       setCreateError("Vui lòng nhập tên panel.");
       return;
     }
 
-    const created = await storageProvider.createPanel(trimmedName);
-    if (!created) {
-      setCreateError("Panel đã tồn tại hoặc đường dẫn không hợp lệ.");
+    let created: Panel | null = null;
+    try {
+      created = await storageProvider.createPanel(trimmedName);
+      if (!created) {
+        setCreateError("Panel đã tồn tại hoặc đường dẫn không hợp lệ.");
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      setCreateError(
+        "Không thể tạo panel trên Firebase. Hãy kiểm tra biến môi trường Vercel và Firestore rules."
+      );
       return;
     }
 
-    // Success! Refresh list, close modal, redirect
     setNewPanelName("");
     setShowAddModal(false);
-    
-    // Redirect to the newly created panel page!
     router.push(`/${created.id}`);
   };
 
   const handleDeletePanel = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     if (confirm("Bạn có chắc chắn muốn xóa panel này? Tất cả dữ liệu bên trong sẽ bị xóa vĩnh viễn.")) {
-      await storageProvider.deletePanel(id);
-      fetchPanels();
+      try {
+        await storageProvider.deletePanel(id);
+        fetchPanels();
+      } catch (error) {
+        console.error(error);
+        setPanelListError("Không thể xóa panel. Hãy kiểm tra quyền ghi Firebase.");
+      }
     }
   };
 
-  // Filter panels based on search query
-  const filteredPanels = panels.filter((p) => {
+  const filteredPanels = panels.filter((panel) => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
-    return p.title.toLowerCase().includes(query) || p.id.toLowerCase().includes(query);
+    return panel.title.toLowerCase().includes(query) || panel.id.toLowerCase().includes(query);
   });
 
   if (loading) {
@@ -140,7 +171,6 @@ export default function Home() {
 
   return (
     <div className="layout-container">
-      {/* Header fixed at top */}
       <Header
         mode="home"
         user={user}
@@ -150,12 +180,17 @@ export default function Home() {
         onSearchChange={setSearchQuery}
       />
 
-      {/* Mainpage Area */}
       <main className="main-content main-content-scroll">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-light)", paddingBottom: "12px" }}>
           <h2 style={{ fontSize: "14px", fontWeight: 600 }}>Tất cả Panels</h2>
           <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{filteredPanels.length} panels</span>
         </div>
+
+        {panelListError && (
+          <div style={{ fontSize: "11px", color: "#ef4444", lineHeight: 1.5 }}>
+            {panelListError}
+          </div>
+        )}
 
         {filteredPanels.length === 0 ? (
           <div className="empty-state">
@@ -164,9 +199,9 @@ export default function Home() {
         ) : (
           <div className="panel-grid">
             {filteredPanels.map((panel) => (
-              <div 
-                key={panel.id} 
-                className="panel-row" 
+              <div
+                key={panel.id}
+                className="panel-row"
                 onClick={() => router.push(`/${panel.id}`)}
                 style={{ cursor: "pointer" }}
               >
@@ -175,9 +210,9 @@ export default function Home() {
                   <span className="panel-meta">/{panel.id}</span>
                 </div>
 
-                <button 
+                <button
                   className="component-control-btn"
-                  onClick={(e) => handleDeletePanel(panel.id, e)}
+                  onClick={(event) => handleDeletePanel(panel.id, event)}
                   title="Xóa panel"
                   style={{ width: "24px", height: "24px" }}
                 >
@@ -192,32 +227,31 @@ export default function Home() {
         )}
       </main>
 
-      {/* Pristine Minimalist Modal for Adding Panel */}
       {showAddModal && (
-        <div 
-          style={{ 
-            position: "fixed", 
-            inset: 0, 
-            backgroundColor: "rgba(255, 255, 255, 0.9)", 
-            backdropFilter: "blur(4px)", 
-            zIndex: 9999, 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center" 
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            backdropFilter: "blur(4px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
           onClick={() => setShowAddModal(false)}
         >
-          <div 
-            style={{ 
-              width: "100%", 
-              maxWidth: "320px", 
-              backgroundColor: "var(--bg-primary)", 
-              border: "1px solid var(--border-light)", 
-              borderRadius: "8px", 
-              padding: "24px", 
-              boxShadow: "0 8px 30px rgba(0,0,0,0.05)" 
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "320px",
+              backgroundColor: "var(--bg-primary)",
+              border: "1px solid var(--border-light)",
+              borderRadius: "8px",
+              padding: "24px",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.05)",
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
             <form onSubmit={handleAddPanel} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -227,19 +261,19 @@ export default function Home() {
                   autoFocus
                   placeholder="Ví dụ: SLSB"
                   value={newPanelName}
-                  onChange={(e) => setNewPanelName(e.target.value)}
-                  style={{ 
-                    width: "100%", 
-                    border: "none", 
-                    borderBottom: "1px solid var(--border-light)", 
+                  onChange={(event) => setNewPanelName(event.target.value)}
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    borderBottom: "1px solid var(--border-light)",
                     padding: "6px 0",
-                    fontSize: "14px"
+                    fontSize: "14px",
                   }}
                 />
               </div>
 
               {createError && (
-                <div style={{ fontSize: "10px", color: "#ef4444" }}>
+                <div style={{ fontSize: "10px", color: "#ef4444", lineHeight: 1.5 }}>
                   {createError}
                 </div>
               )}

@@ -30,7 +30,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         setError("Truy cập bị từ chối. LuPanel là ứng dụng riêng tư và chỉ khả dụng cho tài khoản huuluannt@gmail.com.");
         await signOut(auth);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setError("Đã xảy ra lỗi khi đăng nhập bằng Google. Vui lòng thử lại.");
     } finally {

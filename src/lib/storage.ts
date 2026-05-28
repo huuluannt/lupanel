@@ -5,7 +5,6 @@ import {
   getDocs, 
   getDoc, 
   setDoc, 
-  deleteDoc, 
   query, 
   orderBy, 
   writeBatch 
@@ -23,6 +22,16 @@ export interface PanelComponent {
   type: "title" | "text" | "image";
   value: string; // Text string or base64/remote image URL
   order: number;
+}
+
+export class StorageError extends Error {
+  constructor(
+    message: string,
+    public readonly cause?: unknown
+  ) {
+    super(message);
+    this.name = "StorageError";
+  }
 }
 
 // Helper to generate a slugified URL path
@@ -51,7 +60,8 @@ export const storageProvider = {
         });
         return list;
       } catch (e) {
-        console.error("Firebase getPanels failed, using local storage", e);
+        console.error("Firebase getPanels failed", e);
+        throw new StorageError("Khong the tai danh sach panel tu Firebase.", e);
       }
     }
 
@@ -92,6 +102,7 @@ export const storageProvider = {
         return newPanel;
       } catch (e) {
         console.error("Firebase createPanel failed", e);
+        throw new StorageError("Khong the tao panel tren Firebase.", e);
       }
     }
 
@@ -121,6 +132,7 @@ export const storageProvider = {
         return null;
       } catch (e) {
         console.error("Firebase getPanel failed", e);
+        throw new StorageError("Khong the tai panel tu Firebase.", e);
       }
     }
 
@@ -146,7 +158,7 @@ export const storageProvider = {
           batch.delete(compDoc.ref);
           // If it's an image, we should ideally delete it from storage too
           const data = compDoc.data();
-          if (data.type === "image" && data.value.startsWith("http")) {
+          if (firebaseStorage && data.type === "image" && data.value.startsWith("http")) {
             // Can delete asynchronously in background
             try {
               const imageRef = ref(firebaseStorage, data.value);
@@ -160,6 +172,7 @@ export const storageProvider = {
         return;
       } catch (e) {
         console.error("Firebase deletePanel failed", e);
+        throw new StorageError("Khong the xoa panel tren Firebase.", e);
       }
     }
 
@@ -188,6 +201,7 @@ export const storageProvider = {
         return list;
       } catch (e) {
         console.error("Firebase getComponents failed", e);
+        throw new StorageError("Khong the tai noi dung panel tu Firebase.", e);
       }
     }
 
@@ -235,6 +249,7 @@ export const storageProvider = {
         return;
       } catch (e) {
         console.error("Firebase saveComponents failed", e);
+        throw new StorageError("Khong the luu noi dung panel len Firebase.", e);
       }
     }
 

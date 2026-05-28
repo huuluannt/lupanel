@@ -1,7 +1,7 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { FirebaseApp, initializeApp, getApps, getApp } from "firebase/app";
+import { Auth, getAuth, GoogleAuthProvider } from "firebase/auth";
+import { Firestore, getFirestore } from "firebase/firestore";
+import { FirebaseStorage, getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -21,11 +21,11 @@ export const isFirebaseConfigured = () => {
   );
 };
 
-let app;
-let auth: any = null;
-let db: any = null;
-let storage: any = null;
-let googleProvider: any = null;
+let app: FirebaseApp | undefined;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
+let googleProvider: GoogleAuthProvider | null = null;
 
 if (isFirebaseConfigured()) {
   try {
