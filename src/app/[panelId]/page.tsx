@@ -30,6 +30,10 @@ const getDefaultComponentValue = (type: ComponentType) => {
     return JSON.stringify({ images: [] });
   }
 
+  if (type === "file") {
+    return JSON.stringify({ files: [] });
+  }
+
   return "";
 };
 
@@ -184,8 +188,8 @@ export default function PanelPage({ params }: PageProps) {
     await saveComponents(orderedComponents);
   };
 
-  const handleUploadImage = async (file: File): Promise<string> => {
-    return await storageProvider.uploadImage(panelId, file);
+  const handleUploadFile = async (file: File): Promise<string> => {
+    return await storageProvider.uploadFile(panelId, file);
   };
 
   if (loading) {
@@ -244,7 +248,7 @@ export default function PanelPage({ params }: PageProps) {
           onDeleteComponent={handleDeleteComponent}
           onMoveComponentUp={(id) => void handleMoveComponent(id, "up")}
           onMoveComponentDown={(id) => void handleMoveComponent(id, "down")}
-          onUploadImage={handleUploadImage}
+          onUploadFile={handleUploadFile}
         />
       </main>
     </div>

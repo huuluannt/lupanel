@@ -7,6 +7,7 @@ import TextComponent from "./TextComponent";
 import RichTextComponent from "./RichTextComponent";
 import ImageComponent from "./ImageComponent";
 import GalleryComponent from "./GalleryComponent";
+import FileComponent from "./FileComponent";
 import UrlComponent from "./UrlComponent";
 import YoutubeComponent from "./YoutubeComponent";
 import TableComponent from "./TableComponent";
@@ -17,7 +18,7 @@ interface ComponentListProps {
   onDeleteComponent: (id: string) => void;
   onMoveComponentUp: (id: string) => void;
   onMoveComponentDown: (id: string) => void;
-  onUploadImage: (file: File) => Promise<string>;
+  onUploadFile: (file: File) => Promise<string>;
 }
 
 export default function ComponentList({
@@ -26,7 +27,7 @@ export default function ComponentList({
   onDeleteComponent,
   onMoveComponentUp,
   onMoveComponentDown,
-  onUploadImage,
+  onUploadFile,
 }: ComponentListProps) {
   // To allow smooth focus jumping
   const componentRefs = useRef<Record<string, { focus?: () => void } | null>>({});
@@ -109,7 +110,7 @@ export default function ComponentList({
                 <ImageComponent
                   value={comp.value}
                   onChange={(val) => onComponentChange(comp.id, val)}
-                  onUploadImage={onUploadImage}
+                  onUploadImage={onUploadFile}
                 />
               )}
 
@@ -117,7 +118,15 @@ export default function ComponentList({
                 <GalleryComponent
                   value={comp.value}
                   onChange={(val) => onComponentChange(comp.id, val)}
-                  onUploadImage={onUploadImage}
+                  onUploadImage={onUploadFile}
+                />
+              )}
+
+              {comp.type === "file" && (
+                <FileComponent
+                  value={comp.value}
+                  onChange={(val) => onComponentChange(comp.id, val)}
+                  onUploadFile={onUploadFile}
                 />
               )}
 

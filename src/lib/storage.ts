@@ -17,7 +17,7 @@ export interface Panel {
 
 export interface PanelComponent {
   id: string;
-  type: "title" | "text" | "richtext" | "image" | "url" | "youtube" | "table" | "gallery";
+  type: "title" | "text" | "richtext" | "image" | "file" | "url" | "youtube" | "table" | "gallery";
   value: string; // Text string, URL string, base64/remote image URL, or JSON for complex component state
   order: number;
 }
@@ -291,7 +291,7 @@ export const storageProvider = {
   },
 
   // --- IMAGE / FILE UPLOAD ---
-  async uploadImage(panelId: string, file: File): Promise<string> {
+  async uploadFile(panelId: string, file: File): Promise<string> {
     if (isCloudinaryConfigured()) {
       try {
         const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -329,5 +329,9 @@ export const storageProvider = {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  },
+
+  async uploadImage(panelId: string, file: File): Promise<string> {
+    return this.uploadFile(panelId, file);
   }
 };

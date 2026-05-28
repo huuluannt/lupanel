@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import type { PanelComponent } from "../lib/storage";
 
 interface UserProfile {
   email: string;
@@ -19,7 +20,7 @@ interface HeaderProps {
   searchValue?: string;
   onSearchChange?: (val: string) => void;
   // Panel mode functions
-  onAddComponent?: (type: "title" | "text" | "richtext" | "image" | "url" | "youtube" | "table" | "gallery") => void;
+  onAddComponent?: (type: PanelComponent["type"]) => void;
 }
 
 export default function Header({
@@ -125,7 +126,7 @@ export default function Header({
             </button>
             
             {showComponentMenu && (
-              <div className="dropdown-menu">
+              <div className="dropdown-menu component-dropdown-menu">
                 <button
                   className="dropdown-item"
                   onClick={() => {
@@ -206,6 +207,21 @@ export default function Header({
                     <polyline points="21 15 16 10 5 21"></polyline>
                   </svg>
                   Image
+                </button>
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    onAddComponent("file");
+                    setShowComponentMenu(false);
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <path d="M14 2v6h6" />
+                    <path d="M8 13h8" />
+                    <path d="M8 17h5" />
+                  </svg>
+                  File
                 </button>
                 <button
                   className="dropdown-item"
