@@ -116,6 +116,7 @@ export default function FileComponent({ value, onChange, onUploadFile }: FileCom
   const [dragActive, setDragActive] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<UploadedFile | null>(null);
 
   const filesRef = useRef(files);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -189,8 +190,10 @@ export default function FileComponent({ value, onChange, onUploadFile }: FileCom
     }
   };
 
-  const removeFile = (fileId: string) => {
-    publishFiles(filesRef.current.filter((file) => file.id !== fileId));
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    publishFiles(filesRef.current.filter((file) => file.id !== pendingDelete.id));
+    setPendingDelete(null);
   };
 
   return (
@@ -232,7 +235,12 @@ export default function FileComponent({ value, onChange, onUploadFile }: FileCom
                   {file.name}
                 </a>
                 {sizeLabel && <span className="file-size">{sizeLabel}</span>}
-                <button type="button" className="file-remove-btn" onClick={() => removeFile(file.id)} title="Remove file">
+                <button
+                  type="button"
+                  className="file-remove-btn"
+                  onClick={() => setPendingDelete(file)}
+                  title="Delete file"
+                >
                   X
                 </button>
               </div>
@@ -247,6 +255,25 @@ export default function FileComponent({ value, onChange, onUploadFile }: FileCom
       )}
 
       {error && <div className="file-error">{error}</div>}
+
+      {pendingDelete && (
+        <div className="component-confirm-backdrop" role="dialog" aria-modal="true">
+          <div className="component-confirm-modal">
+            <div className="component-confirm-title">Delete this file?</div>
+            <div className="component-confirm-desc">
+              {pendingDelete.name} will be removed from this component.
+            </div>
+            <div className="component-confirm-actions">
+              <button type="button" className="component-confirm-secondary" onClick={() => setPendingDelete(null)}>
+                Cancel
+              </button>
+              <button type="button" className="component-confirm-danger" onClick={confirmDelete}>
+                Delete file
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

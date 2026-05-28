@@ -82,11 +82,15 @@ const sanitizeHtml = (html: string) => {
 export default function RichTextComponent({ value, onChange }: RichTextComponentProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hideToolbarTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const savedSelectionRef = useRef<Range | null>(null);
   const [initialValue] = useState(() => sanitizeHtml(value));
   const [activeFormats, setActiveFormats] = useState<ActiveFormats>(DEFAULT_FORMATS);
   const [isToolbarVisible, setIsToolbarVisible] = useState(false);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
 
   const publishValue = () => {
     const editor = editorRef.current;
@@ -135,12 +139,46 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
     runCommand("backColor", activeFormats.highlight ? "transparent" : "#fff299");
   };
 
-  const applyLink = () => {
-    focusEditor();
-    const rawUrl = window.prompt("Nhap URL");
-    if (rawUrl === null) return;
+  const saveCurrentSelection = () => {
+    const selection = window.getSelection();
+    const editor = editorRef.current;
+    if (!selection || !editor || selection.rangeCount === 0) {
+      savedSelectionRef.current = null;
+      return;
+    }
 
-    const url = normalizeUrl(rawUrl);
+    const range = selection.getRangeAt(0);
+    const withinEditor = editor.contains(range.commonAncestorContainer);
+    savedSelectionRef.current = withinEditor ? range.cloneRange() : null;
+  };
+
+  const restoreSavedSelection = () => {
+    const selection = window.getSelection();
+    if (!selection || !savedSelectionRef.current) return;
+
+    selection.removeAllRanges();
+    selection.addRange(savedSelectionRef.current);
+  };
+
+  const openLinkDialog = () => {
+    saveCurrentSelection();
+    setLinkUrl("");
+    setIsLinkDialogOpen(true);
+    showToolbar();
+  };
+
+  const closeLinkDialog = () => {
+    setIsLinkDialogOpen(false);
+    setLinkUrl("");
+    savedSelectionRef.current = null;
+  };
+
+  const applyLink = (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    focusEditor();
+    restoreSavedSelection();
+
+    const url = normalizeUrl(linkUrl);
     if (!url) return;
 
     const selection = window.getSelection();
@@ -157,6 +195,7 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
 
     updateActiveFormats();
     schedulePublish();
+    closeLinkDialog();
   };
 
   const clearFormatting = () => {
@@ -209,6 +248,12 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
       editorRef.current.innerHTML = initialValue;
     }
   }, [initialValue]);
+
+  useEffect(() => {
+    if (isLinkDialogOpen) {
+      linkInputRef.current?.focus();
+    }
+  }, [isLinkDialogOpen]);
 
   useEffect(() => {
     document.addEventListener("selectionchange", updateActiveFormats);
@@ -264,7 +309,7 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
         >
           H
         </button>
-        <button type="button" className="richtext-tool-btn link" onClick={applyLink} title="Link URL">
+        <button type="button" className="richtext-tool-btn link" onClick={openLinkDialog} title="Link URL">
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M6.7 10.8H5a2.8 2.8 0 0 1 0-5.6h1.7" />
             <path d="M9.3 5.2H11a2.8 2.8 0 0 1 0 5.6H9.3" />
@@ -275,6 +320,27 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
           Tx
         </button>
       </div>
+
+      {isLinkDialogOpen && (
+        <form className="richtext-link-popover" onSubmit={applyLink}>
+          <label className="richtext-link-label">URL</label>
+          <input
+            ref={linkInputRef}
+            className="richtext-link-input"
+            value={linkUrl}
+            onChange={(event) => setLinkUrl(event.target.value)}
+            placeholder="https://example.com"
+          />
+          <div className="richtext-link-actions">
+            <button type="button" className="richtext-link-secondary" onClick={closeLinkDialog}>
+              Cancel
+            </button>
+            <button type="submit" className="richtext-link-primary">
+              Add
+            </button>
+          </div>
+        </form>
+      )}
 
       <div
         ref={editorRef}

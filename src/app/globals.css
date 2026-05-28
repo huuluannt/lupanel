@@ -499,7 +499,7 @@ input, textarea {
 .richtext-toolbar {
   position: absolute;
   left: 0;
-  top: -8px;
+  top: 100%;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -512,14 +512,86 @@ input, textarea {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(calc(-100% - 4px));
+  transform: translateY(4px);
   transition: opacity 0.14s ease, transform 0.14s ease;
 }
 
 .richtext-component-wrapper.is-active .richtext-toolbar {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(calc(-100% - 8px));
+  transform: translateY(8px);
+}
+
+.richtext-link-popover {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 46px);
+  z-index: 21;
+  width: min(320px, calc(100vw - 48px));
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background-color: #ffffff;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
+}
+
+.richtext-link-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.richtext-link-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.richtext-link-input:focus {
+  border-color: var(--border-focus);
+}
+
+.richtext-link-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.richtext-link-secondary,
+.richtext-link-primary {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.richtext-link-secondary {
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  background-color: #ffffff;
+}
+
+.richtext-link-secondary:hover {
+  background-color: var(--bg-hover);
+}
+
+.richtext-link-primary {
+  border: 1px solid #111111;
+  color: #ffffff;
+  background-color: #111111;
+}
+
+.richtext-link-primary:hover {
+  background-color: #27272a;
 }
 
 .richtext-tool-btn {

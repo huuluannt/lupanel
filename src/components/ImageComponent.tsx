@@ -9,23 +9,20 @@ interface ImageComponentProps {
   onUploadImage: (file: File) => Promise<string>;
 }
 
-export default function ImageComponent({
-  value,
-  onChange,
-  onUploadImage,
-}: ImageComponentProps) {
+export default function ImageComponent({ value, onChange, onUploadImage }: ImageComponentProps) {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(true);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      setError("Chỉ chấp nhận file hình ảnh.");
+      setError("Only image files are supported.");
       return;
     }
 
@@ -36,7 +33,7 @@ export default function ImageComponent({
       onChange(url);
     } catch (err) {
       console.error(err);
-      setError("Không thể tải hình ảnh lên Cloudinary. Vui lòng thử lại.");
+      setError("Could not upload the image to Cloudinary. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -55,7 +52,7 @@ export default function ImageComponent({
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.[0]) {
-      processFile(event.target.files[0]);
+      void processFile(event.target.files[0]);
     }
   };
 
@@ -75,7 +72,7 @@ export default function ImageComponent({
     setDragActive(false);
 
     if (event.dataTransfer.files?.[0]) {
-      processFile(event.dataTransfer.files[0]);
+      void processFile(event.dataTransfer.files[0]);
     }
   };
 
@@ -90,16 +87,21 @@ export default function ImageComponent({
         const blob = items[index].getAsFile();
         if (blob) {
           event.preventDefault();
-          processFile(blob);
+          void processFile(blob);
           break;
         }
       }
     }
   };
 
-  const handleDelete = (event: React.MouseEvent) => {
+  const requestDelete = (event: React.MouseEvent) => {
     event.stopPropagation();
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
     onChange("");
+    setDeleteConfirmOpen(false);
   };
 
   return (
@@ -123,8 +125,8 @@ export default function ImageComponent({
             onClick={() => setViewerOpen(true)}
             style={{ cursor: "zoom-in" }}
           />
-          <button className="image-delete-btn" onClick={handleDelete} title="Xóa ảnh">
-            ×
+          <button className="image-delete-btn" onClick={requestDelete} title="Delete image">
+            X
           </button>
         </div>
       ) : (
@@ -163,24 +165,33 @@ export default function ImageComponent({
               </span>
             </div>
           )}
-
-          <style jsx global>{`
-            @keyframes spin {
-              to {
-                transform: rotate(360deg);
-              }
-            }
-          `}</style>
         </div>
       )}
 
-      {error && (
-        <div style={{ fontSize: "10px", color: "#ef4444", marginTop: "4px" }}>
-          {error}
-        </div>
-      )}
+      {error && <div style={{ fontSize: "10px", color: "#ef4444", marginTop: "4px" }}>{error}</div>}
 
       {viewerOpen && <ImageViewer src={value} onClose={() => setViewerOpen(false)} />}
+
+      {deleteConfirmOpen && (
+        <div className="component-confirm-backdrop" role="dialog" aria-modal="true">
+          <div className="component-confirm-modal">
+            <div className="component-confirm-title">Delete this image?</div>
+            <div className="component-confirm-desc">This image will be removed from the component.</div>
+            <div className="component-confirm-actions">
+              <button
+                type="button"
+                className="component-confirm-secondary"
+                onClick={() => setDeleteConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="component-confirm-danger" onClick={confirmDelete}>
+                Delete image
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

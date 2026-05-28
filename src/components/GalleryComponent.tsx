@@ -195,7 +195,7 @@ export default function GalleryComponent({
               type="button"
               className="gallery-image-delete-btn"
               onClick={() => setPendingDelete(image)}
-              title="Xoa anh"
+              title="Delete image"
             >
               X
             </button>
@@ -224,13 +224,13 @@ export default function GalleryComponent({
       {pendingDelete && (
         <div className="gallery-confirm-backdrop" role="dialog" aria-modal="true">
           <div className="gallery-confirm-modal">
-            <div className="gallery-confirm-title">Xoa anh nay?</div>
+            <div className="gallery-confirm-title">Delete this image?</div>
             <div className="gallery-confirm-actions">
               <button type="button" className="gallery-confirm-secondary" onClick={() => setPendingDelete(null)}>
-                Huy
+                Cancel
               </button>
               <button type="button" className="gallery-confirm-danger" onClick={confirmDelete}>
-                Xoa anh
+                Delete image
               </button>
             </div>
           </div>
