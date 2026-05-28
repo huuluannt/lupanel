@@ -125,11 +125,11 @@ export default function PanelPage({ params }: PageProps) {
     }
   };
 
-  const handleAddComponent = async (type: "title" | "text" | "image" | "url" | "youtube") => {
+  const handleAddComponent = async (type: "title" | "text" | "image" | "url" | "youtube" | "table") => {
     const newComp: PanelComponent = {
       id: `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       type,
-      value: "",
+      value: type === "table" ? JSON.stringify({ rows: [ ["", ""], ["", ""] ], colWidths: [220, 220], rowHeights: [80, 80] }) : "",
       order: components.length > 0 ? Math.max(...components.map((item) => item.order)) + 1 : 0,
     };
 

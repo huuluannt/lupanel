@@ -19,7 +19,7 @@ interface HeaderProps {
   searchValue?: string;
   onSearchChange?: (val: string) => void;
   // Panel mode functions
-  onAddComponent?: (type: "title" | "text" | "image" | "url" | "youtube") => void;
+  onAddComponent?: (type: "title" | "text" | "image" | "url" | "youtube" | "table") => void;
 }
 
 export default function Header({
@@ -191,6 +191,22 @@ export default function Header({
                     <polyline points="21 15 16 10 5 21"></polyline>
                   </svg>
                   Image
+                </button>
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    onAddComponent("table");
+                    setShowComponentMenu(false);
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <path d="M3 9h18" />
+                    <path d="M3 15h18" />
+                    <path d="M9 3v18" />
+                    <path d="M15 3v18" />
+                  </svg>
+                  Table
                 </button>
               </div>
             )}

@@ -33,17 +33,20 @@ export default function YoutubeComponent({ value, onChange }: YoutubeComponentPr
   const [data, setData] = useState<YoutubeData | null>(null);
 
   useEffect(() => {
-    if (value) {
-      try {
-        const parsed = JSON.parse(value) as YoutubeData;
-        setData(parsed);
-        setDraftUrl(parsed.url);
-      } catch {
-        setData(null);
+    queueMicrotask(() => {
+      if (value) {
+        try {
+          const parsed = JSON.parse(value) as YoutubeData;
+          setData(parsed);
+          setDraftUrl(parsed.url);
+          setEditing(false);
+        } catch {
+          setData(null);
+        }
+      } else {
+        setEditing(true);
       }
-    } else {
-      setEditing(true);
-    }
+    });
   }, [value]);
 
   const handleInsert = () => {

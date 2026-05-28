@@ -29,8 +29,10 @@ export default function UrlComponent({ value, onChange }: UrlComponentProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDraftUrl(value);
-    setEditing(value === "");
+    queueMicrotask(() => {
+      setDraftUrl(value);
+      setEditing(value === "");
+    });
   }, [value]);
 
   const handleInsert = () => {

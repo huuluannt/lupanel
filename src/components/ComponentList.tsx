@@ -7,6 +7,7 @@ import TextComponent from "./TextComponent";
 import ImageComponent from "./ImageComponent";
 import UrlComponent from "./UrlComponent";
 import YoutubeComponent from "./YoutubeComponent";
+import TableComponent from "./TableComponent";
 
 interface ComponentListProps {
   components: PanelComponent[];
@@ -111,6 +112,13 @@ export default function ComponentList({
 
               {comp.type === "youtube" && (
                 <YoutubeComponent
+                  value={comp.value}
+                  onChange={(val) => onComponentChange(comp.id, val)}
+                />
+              )}
+
+              {comp.type === "table" && (
+                <TableComponent
                   value={comp.value}
                   onChange={(val) => onComponentChange(comp.id, val)}
                 />
