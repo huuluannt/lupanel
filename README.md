@@ -37,4 +37,6 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 This repository includes `vercel.json` so deployments use the Next.js framework preset and clear any incorrect `dist` output-directory override. If Vercel still reports `No Output Directory named "dist"`, reset the Project Settings output directory override and redeploy.
 
-For live panel creation on `lupanel.vercel.app`, make sure Vercel has all `NEXT_PUBLIC_FIREBASE_*` variables from `.env.example`, Firebase Authentication includes `lupanel.vercel.app` in Authorized domains, and Firestore rules allow the signed-in owner account to read/write `panels` and `panels/{panelId}/components`.
+For live panel creation on `lupanel.vercel.app`, make sure Vercel has the required `NEXT_PUBLIC_FIREBASE_*` variables from `.env.example`, Firebase Authentication includes `lupanel.vercel.app` in Authorized domains, and Firestore rules from `firestore.rules` are published.
+
+Image uploads use Cloudinary, not Firebase Storage. Create an unsigned upload preset in Cloudinary, then add `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`, and optional `NEXT_PUBLIC_CLOUDINARY_FOLDER` to Vercel.

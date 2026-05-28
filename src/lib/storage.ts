@@ -1,4 +1,4 @@
-import { isFirebaseConfigured, db, storage as firebaseStorage } from "./firebase";
+import { isFirebaseConfigured, db } from "./firebase";
 import { 
   collection, 
   doc, 
@@ -9,7 +9,6 @@ import {
   orderBy, 
   writeBatch 
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 export interface Panel {
   id: string; // Slugified ID e.g., 'slsb'
@@ -33,6 +32,21 @@ export class StorageError extends Error {
     this.name = "StorageError";
   }
 }
+
+interface CloudinaryUploadResponse {
+  secure_url?: string;
+  url?: string;
+  error?: {
+    message?: string;
+  };
+}
+
+const isCloudinaryConfigured = () => {
+  return !!(
+    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME &&
+    process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+  );
+};
 
 // Helper to generate a slugified URL path
 export const slugify = (text: string): string => {
@@ -156,15 +170,6 @@ export const storageProvider = {
         const batch = writeBatch(db);
         componentsSnap.forEach((compDoc) => {
           batch.delete(compDoc.ref);
-          // If it's an image, we should ideally delete it from storage too
-          const data = compDoc.data();
-          if (firebaseStorage && data.type === "image" && data.value.startsWith("http")) {
-            // Can delete asynchronously in background
-            try {
-              const imageRef = ref(firebaseStorage, data.value);
-              deleteObject(imageRef).catch(() => {});
-            } catch {}
-          }
         });
         
         batch.delete(doc(db, "panels", id));
@@ -258,19 +263,33 @@ export const storageProvider = {
     }
   },
 
-  // --- IMAGE UPLOAD ---
+  // --- IMAGE / FILE UPLOAD ---
   async uploadImage(panelId: string, file: File): Promise<string> {
-    if (isFirebaseConfigured() && firebaseStorage) {
+    if (isCloudinaryConfigured()) {
       try {
-        const fileExtension = file.name.split(".").pop() || "png";
-        const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
-        const storageRef = ref(firebaseStorage, `panels/${panelId}/${uniqueFileName}`);
-        
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadUrl = await getDownloadURL(snapshot.ref);
-        return downloadUrl;
+        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+        const folder = process.env.NEXT_PUBLIC_CLOUDINARY_FOLDER || `lupanel/${panelId}`;
+        const formData = new FormData();
+
+        formData.append("file", file);
+        formData.append("upload_preset", uploadPreset as string);
+        formData.append("folder", folder);
+
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+          method: "POST",
+          body: formData,
+        });
+        const data = (await response.json()) as CloudinaryUploadResponse;
+
+        if (!response.ok || data.error || (!data.secure_url && !data.url)) {
+          throw new StorageError(data.error?.message || "Cloudinary upload failed.");
+        }
+
+        return data.secure_url || (data.url as string);
       } catch (e) {
-        console.error("Firebase Storage upload failed, falling back to Base64", e);
+        console.error("Cloudinary upload failed", e);
+        throw new StorageError("Khong the tai file len Cloudinary.", e);
       }
     }
 

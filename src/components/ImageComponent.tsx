@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import ImageViewer from "./ImageViewer";
 
 interface ImageComponentProps {
-  value: string; // The image source (Base64 or Firebase URL)
+  value: string;
   onChange: (newValue: string) => void;
   onUploadImage: (file: File) => Promise<string>;
 }
@@ -23,7 +23,6 @@ export default function ImageComponent({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-
   const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       setError("Chỉ chấp nhận file hình ảnh.");
@@ -37,72 +36,69 @@ export default function ImageComponent({
       onChange(url);
     } catch (err) {
       console.error(err);
-      setError("Không thể tải hình ảnh lên. Vui lòng thử lại.");
+      setError("Không thể tải hình ảnh lên Cloudinary. Vui lòng thử lại.");
     } finally {
       setUploading(false);
     }
   };
 
-  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { naturalWidth, naturalHeight } = e.currentTarget;
+  const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = event.currentTarget;
     setIsLandscape(naturalWidth > naturalHeight);
   };
 
-  // Browse (click to choose file)
   const handleClick = () => {
     if (!uploading && !value) {
       fileInputRef.current?.click();
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files?.[0]) {
+      processFile(event.target.files[0]);
     }
   };
 
-  // Drag & Drop
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+  const handleDrag = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.type === "dragenter" || event.type === "dragover") {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (event.type === "dragleave") {
       setDragActive(false);
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
+    if (event.dataTransfer.files?.[0]) {
+      processFile(event.dataTransfer.files[0]);
     }
   };
 
-  // Clipboard Paste (Ctrl + V)
-  const handlePaste = (e: React.ClipboardEvent) => {
+  const handlePaste = (event: React.ClipboardEvent) => {
     if (value || uploading) return;
-    
-    const items = e.clipboardData?.items;
-    if (items) {
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
-          const blob = items[i].getAsFile();
-          if (blob) {
-            e.preventDefault();
-            processFile(blob);
-            break;
-          }
+
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let index = 0; index < items.length; index += 1) {
+      if (items[index].type.includes("image")) {
+        const blob = items[index].getAsFile();
+        if (blob) {
+          event.preventDefault();
+          processFile(blob);
+          break;
         }
       }
     }
   };
 
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = (event: React.MouseEvent) => {
+    event.stopPropagation();
     onChange("");
   };
 
@@ -119,16 +115,16 @@ export default function ImageComponent({
       {value ? (
         <div className={`image-preview-container ${isLandscape ? "landscape" : "portrait"}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
-            src={value} 
-            alt="Preview" 
-            className="image-preview-img" 
+          <img
+            src={value}
+            alt="Preview"
+            className="image-preview-img"
             onLoad={handleImageLoad}
             onClick={() => setViewerOpen(true)}
             style={{ cursor: "zoom-in" }}
           />
           <button className="image-delete-btn" onClick={handleDelete} title="Xóa ảnh">
-            ✕
+            ×
           </button>
         </div>
       ) : (
@@ -141,20 +137,20 @@ export default function ImageComponent({
           onDragLeave={handleDrag}
           onDrop={handleDrop}
           onPaste={handlePaste}
-          tabIndex={0} // Makes it focusable to listen for Ctrl + V pastes
-          aria-label="Upload Image (Click to browse, drag file, or paste image here)"
+          tabIndex={0}
+          aria-label="Upload image by browsing, dragging, or pasting"
           style={{ outline: "none" }}
         >
           {uploading ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-              <div 
-                style={{ 
-                  width: "16px", 
-                  height: "16px", 
-                  border: "1.5px solid var(--border-light)", 
-                  borderTopColor: "var(--border-focus)", 
+              <div
+                style={{
+                  width: "16px",
+                  height: "16px",
+                  border: "1.5px solid var(--border-light)",
+                  borderTopColor: "var(--border-focus)",
                   borderRadius: "50%",
-                  animation: "spin 0.8s linear infinite"
+                  animation: "spin 0.8s linear infinite",
                 }}
               />
               <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>Uploading...</span>
@@ -167,10 +163,12 @@ export default function ImageComponent({
               </span>
             </div>
           )}
-          
+
           <style jsx global>{`
             @keyframes spin {
-              to { transform: rotate(360deg); }
+              to {
+                transform: rotate(360deg);
+              }
             }
           `}</style>
         </div>
@@ -182,9 +180,7 @@ export default function ImageComponent({
         </div>
       )}
 
-      {viewerOpen && (
-        <ImageViewer src={value} onClose={() => setViewerOpen(false)} />
-      )}
+      {viewerOpen && <ImageViewer src={value} onClose={() => setViewerOpen(false)} />}
     </div>
   );
 }

@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email == "huuluannt@gmail.com";
+    }
+
+    match /panels/{panelId} {
+      allow read, create, update, delete: if isOwner();
+
+      match /components/{componentId} {
+        allow read, create, update, delete: if isOwner();
+      }
+    }
+  }
+}

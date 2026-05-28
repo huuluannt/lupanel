@@ -1,7 +1,6 @@
 import { FirebaseApp, initializeApp, getApps, getApp } from "firebase/app";
 import { Auth, getAuth, GoogleAuthProvider } from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
-import { FirebaseStorage, getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -24,7 +23,6 @@ export const isFirebaseConfigured = () => {
 let app: FirebaseApp | undefined;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
 let googleProvider: GoogleAuthProvider | null = null;
 
 if (isFirebaseConfigured()) {
@@ -32,7 +30,6 @@ if (isFirebaseConfigured()) {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
     db = getFirestore(app);
-    storage = getStorage(app);
     googleProvider = new GoogleAuthProvider();
   } catch (error) {
     console.error("Error initializing Firebase:", error);
@@ -41,4 +38,4 @@ if (isFirebaseConfigured()) {
   console.log("Firebase credentials not configured. Running in localStorage fallback mode.");
 }
 
-export { auth, db, storage, googleProvider };
+export { auth, db, googleProvider };
