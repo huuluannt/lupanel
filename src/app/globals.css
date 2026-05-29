@@ -1560,6 +1560,18 @@ input, textarea {
   group-hover: show;
 }
 
+.component-row.is-selected::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background-color: #111111;
+  opacity: 0.18;
+}
+
 .component-row + .component-row {
   border-top: 1px solid #e4e4e7; /* Đậm hơn một chút xíu để phân biệt rõ ràng */
 }

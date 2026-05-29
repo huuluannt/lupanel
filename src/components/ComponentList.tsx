@@ -19,6 +19,8 @@ interface ComponentListProps {
   onMoveComponentUp: (id: string) => void;
   onMoveComponentDown: (id: string) => void;
   onUploadFile: (file: File) => Promise<string>;
+  selectedComponentId: string | null;
+  onSelectComponent: (id: string) => void;
 }
 
 export default function ComponentList({
@@ -28,6 +30,8 @@ export default function ComponentList({
   onMoveComponentUp,
   onMoveComponentDown,
   onUploadFile,
+  selectedComponentId,
+  onSelectComponent,
 }: ComponentListProps) {
   const componentRefs = useRef<Record<string, { focus?: () => void } | null>>({});
   const [pendingDeleteComponent, setPendingDeleteComponent] = useState<PanelComponent | null>(null);
@@ -51,7 +55,12 @@ export default function ComponentList({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0px", paddingBottom: "100px" }}>
       {components.map((comp, idx) => (
-        <div key={comp.id} className="component-row">
+        <div
+          key={comp.id}
+          className={`component-row ${selectedComponentId === comp.id ? "is-selected" : ""}`}
+          onFocusCapture={() => onSelectComponent(comp.id)}
+          onMouseDown={() => onSelectComponent(comp.id)}
+        >
           <div className="component-controls">
             <button
               className="component-control-btn"

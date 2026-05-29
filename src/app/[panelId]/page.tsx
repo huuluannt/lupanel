@@ -53,6 +53,7 @@ export default function PanelPage({ params }: PageProps) {
   const [loading, setLoading] = useState(() => isFirebaseConfigured());
   const [panel, setPanel] = useState<Panel | null>(null);
   const [components, setComponents] = useState<PanelComponent[]>([]);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
 
@@ -68,6 +69,7 @@ export default function PanelPage({ params }: PageProps) {
       setPanel(meta);
       const list = await storageProvider.getComponents(panelId);
       setComponents(list);
+      setSelectedComponentId(null);
     } catch (error) {
       console.error(error);
       setStorageError("Không thể tải panel từ Firebase. Hãy kiểm tra biến môi trường Vercel và Firestore rules.");
@@ -130,6 +132,7 @@ export default function PanelPage({ params }: PageProps) {
     setUser(null);
     setPanel(null);
     setComponents([]);
+    setSelectedComponentId(null);
   };
 
   const saveComponents = async (nextComponents: PanelComponent[]) => {
@@ -148,10 +151,23 @@ export default function PanelPage({ params }: PageProps) {
       id: `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       type,
       value: getDefaultComponentValue(type),
-      order: components.length > 0 ? Math.max(...components.map((item) => item.order)) + 1 : 0,
+      order: 0,
     };
 
-    await saveComponents([...components, newComp]);
+    const insertIndex = selectedComponentId
+      ? components.findIndex((component) => component.id === selectedComponentId) + 1
+      : components.length;
+    const safeInsertIndex = insertIndex > 0 ? insertIndex : components.length;
+    const nextComponents = [...components];
+    nextComponents.splice(safeInsertIndex, 0, newComp);
+
+    const orderedComponents = nextComponents.map((component, index) => ({
+      ...component,
+      order: index,
+    }));
+
+    setSelectedComponentId(newComp.id);
+    await saveComponents(orderedComponents);
   };
 
   const handleComponentChange = async (id: string, newValue: string) => {
@@ -166,6 +182,9 @@ export default function PanelPage({ params }: PageProps) {
   };
 
   const handleDeleteComponent = async (id: string) => {
+    if (selectedComponentId === id) {
+      setSelectedComponentId(null);
+    }
     await saveComponents(components.filter((component) => component.id !== id));
   };
 
@@ -249,6 +268,8 @@ export default function PanelPage({ params }: PageProps) {
           onMoveComponentUp={(id) => void handleMoveComponent(id, "up")}
           onMoveComponentDown={(id) => void handleMoveComponent(id, "down")}
           onUploadFile={handleUploadFile}
+          selectedComponentId={selectedComponentId}
+          onSelectComponent={setSelectedComponentId}
         />
       </main>
     </div>
