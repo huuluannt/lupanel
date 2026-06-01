@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import LoginScreen from "../components/LoginScreen";
@@ -13,6 +13,8 @@ interface UserProfile {
   displayName: string;
   photoURL: string;
 }
+
+type PanelFormMode = "create" | "edit";
 
 export default function Home() {
   const router = useRouter();
@@ -30,10 +32,14 @@ export default function Home() {
 
   const [panels, setPanels] = useState<Panel[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newPanelName, setNewPanelName] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [panelFormOpen, setPanelFormOpen] = useState(false);
+  const [panelFormMode, setPanelFormMode] = useState<PanelFormMode>("create");
+  const [editingPanel, setEditingPanel] = useState<Panel | null>(null);
+  const [panelName, setPanelName] = useState("");
+  const [panelCode, setPanelCode] = useState("");
+  const [panelFormError, setPanelFormError] = useState<string | null>(null);
   const [panelListError, setPanelListError] = useState<string | null>(null);
+  const panelBackdropMouseDownRef = useRef(false);
 
   const fetchPanels = useCallback(async () => {
     try {
@@ -42,9 +48,7 @@ export default function Home() {
       setPanels(list);
     } catch (error) {
       console.error(error);
-      setPanelListError(
-        "Không thể tải danh sách panel. Hãy kiểm tra Firebase env và Firestore rules trên Vercel."
-      );
+      setPanelListError("Could not load panels. Check Firebase env and Firestore rules on Vercel.");
       setPanels([]);
     }
   }, []);
@@ -106,55 +110,103 @@ export default function Home() {
     setPanels([]);
   };
 
-  const handleAddPanel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateError(null);
-
-    const trimmedName = newPanelName.trim();
-    if (!trimmedName) {
-      setCreateError("Vui lòng nhập tên panel.");
-      return;
-    }
-
-    let created: Panel | null = null;
-    try {
-      created = await storageProvider.createPanel(trimmedName);
-      if (!created) {
-        setCreateError("Panel đã tồn tại hoặc đường dẫn không hợp lệ.");
-        return;
-      }
-    } catch (error) {
-      console.error(error);
-      setCreateError(
-        "Không thể tạo panel trên Firebase. Hãy kiểm tra biến môi trường Vercel và Firestore rules."
-      );
-      return;
-    }
-
-    setNewPanelName("");
-    setShowAddModal(false);
-    router.push(`/${created.id}`);
+  const openCreatePanel = () => {
+    setPanelFormMode("create");
+    setEditingPanel(null);
+    setPanelName("");
+    setPanelCode("");
+    setPanelFormError(null);
+    setPanelFormOpen(true);
   };
 
-  const handleDeletePanel = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const openEditPanel = (panel: Panel, event: React.MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setPanelFormMode("edit");
+    setEditingPanel(panel);
+    setPanelName(panel.name);
+    setPanelCode(panel.code);
+    setPanelFormError(null);
+    setPanelFormOpen(true);
+  };
 
-    if (confirm("Bạn có chắc chắn muốn xóa panel này? Tất cả dữ liệu bên trong sẽ bị xóa vĩnh viễn.")) {
-      try {
-        await storageProvider.deletePanel(id);
-        fetchPanels();
-      } catch (error) {
-        console.error(error);
-        setPanelListError("Không thể xóa panel. Hãy kiểm tra quyền ghi Firebase.");
+  const closePanelForm = () => {
+    setPanelFormOpen(false);
+    setEditingPanel(null);
+    setPanelFormError(null);
+  };
+
+  const handlePanelBackdropMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    panelBackdropMouseDownRef.current = event.target === event.currentTarget;
+  };
+
+  const handlePanelBackdropMouseUp = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (panelBackdropMouseDownRef.current && event.target === event.currentTarget) {
+      closePanelForm();
+    }
+    panelBackdropMouseDownRef.current = false;
+  };
+
+  const handlePanelFormSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setPanelFormError(null);
+
+    const trimmedName = panelName.trim();
+    const trimmedCode = panelCode.trim();
+    if (!trimmedName) {
+      setPanelFormError("Name is required.");
+      return;
+    }
+    if (!trimmedCode) {
+      setPanelFormError("Code is required.");
+      return;
+    }
+
+    try {
+      if (panelFormMode === "create") {
+        const created = await storageProvider.createPanel(trimmedName, trimmedCode);
+        if (!created) {
+          setPanelFormError("Code already exists or is invalid.");
+          return;
+        }
+        closePanelForm();
+        router.push(`/${created.id}`);
+        return;
       }
+
+      if (!editingPanel) return;
+      const updated = await storageProvider.updatePanel(editingPanel.id, trimmedName, trimmedCode);
+      if (!updated) {
+        setPanelFormError("Code already exists or is invalid.");
+        return;
+      }
+      closePanelForm();
+      await fetchPanels();
+    } catch (error) {
+      console.error(error);
+      setPanelFormError("Could not save panel. Check Firebase write permissions.");
+    }
+  };
+
+  const handleDeletePanel = async (id: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+
+    if (!window.confirm("Delete this panel? All content inside it will be permanently removed.")) return;
+
+    try {
+      await storageProvider.deletePanel(id);
+      await fetchPanels();
+    } catch (error) {
+      console.error(error);
+      setPanelListError("Could not delete panel. Check Firebase write permissions.");
     }
   };
 
   const filteredPanels = panels.filter((panel) => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
-    return panel.title.toLowerCase().includes(query) || panel.id.toLowerCase().includes(query);
+    return panel.name.toLowerCase().includes(query) || panel.code.toLowerCase().includes(query);
   });
 
   if (loading) {
@@ -175,26 +227,24 @@ export default function Home() {
         mode="home"
         user={user}
         onLogout={handleLogout}
-        onAddPanel={() => setShowAddModal(true)}
+        onAddPanel={openCreatePanel}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
       />
 
       <main className="main-content main-content-scroll">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-light)", paddingBottom: "12px" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: 600 }}>Tất cả Panels</h2>
+          <h2 style={{ fontSize: "14px", fontWeight: 600 }}>All Panels</h2>
           <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{filteredPanels.length} panels</span>
         </div>
 
         {panelListError && (
-          <div style={{ fontSize: "11px", color: "#ef4444", lineHeight: 1.5 }}>
-            {panelListError}
-          </div>
+          <div style={{ fontSize: "11px", color: "#ef4444", lineHeight: 1.5 }}>{panelListError}</div>
         )}
 
         {filteredPanels.length === 0 ? (
           <div className="empty-state">
-            {searchQuery ? "Không tìm thấy panel nào phù hợp." : "Chưa có panel nào được tạo."}
+            {searchQuery ? "No matching panels found." : "No panels have been created yet."}
           </div>
         ) : (
           <div className="panel-grid">
@@ -205,85 +255,75 @@ export default function Home() {
                 onClick={() => router.push(`/${panel.id}`)}
                 style={{ cursor: "pointer" }}
               >
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span className="panel-title">{panel.title}</span>
-                  <span className="panel-meta">/{panel.id}</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+                  <span className="panel-title">{panel.name}</span>
+                  <span className="panel-meta">/{panel.code}</span>
                 </div>
 
-                <button
-                  className="component-control-btn"
-                  onClick={(event) => handleDeletePanel(panel.id, event)}
-                  title="Xóa panel"
-                  style={{ width: "24px", height: "24px" }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  </svg>
-                </button>
+                <div className="panel-actions">
+                  <button
+                    className="component-control-btn panel-action-btn"
+                    onClick={(event) => openEditPanel(panel, event)}
+                    title="Edit panel"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                    </svg>
+                  </button>
+                  <button
+                    className="component-control-btn panel-action-btn"
+                    onClick={(event) => handleDeletePanel(panel.id, event)}
+                    title="Delete panel"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </main>
 
-      {showAddModal && (
+      {panelFormOpen && (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            backdropFilter: "blur(4px)",
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-          onClick={() => setShowAddModal(false)}
+          className="panel-form-backdrop"
+          onMouseDown={handlePanelBackdropMouseDown}
+          onMouseUp={handlePanelBackdropMouseUp}
         >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: "320px",
-              backgroundColor: "var(--bg-primary)",
-              border: "1px solid var(--border-light)",
-              borderRadius: "8px",
-              padding: "24px",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.05)",
-            }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <form onSubmit={handleAddPanel} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label style={{ fontSize: "11px", fontWeight: 500, color: "var(--text-secondary)" }}>TÊN PANEL MỚI</label>
+          <div className="panel-form-modal">
+            <form onSubmit={handlePanelFormSubmit} className="panel-form">
+              <div className="panel-form-field">
+                <label>Name</label>
                 <input
                   type="text"
                   autoFocus
-                  placeholder="Ví dụ: SLSB"
-                  value={newPanelName}
-                  onChange={(event) => setNewPanelName(event.target.value)}
-                  style={{
-                    width: "100%",
-                    border: "none",
-                    borderBottom: "1px solid var(--border-light)",
-                    padding: "6px 0",
-                    fontSize: "14px",
-                  }}
+                  placeholder="Hoi nghi Khoa hoc quoc te FBB"
+                  value={panelName}
+                  onChange={(event) => setPanelName(event.target.value)}
+                />
+              </div>
+              <div className="panel-form-field">
+                <label>Code</label>
+                <input
+                  type="text"
+                  placeholder="SLSB"
+                  value={panelCode}
+                  onChange={(event) => setPanelCode(event.target.value)}
                 />
               </div>
 
-              {createError && (
-                <div style={{ fontSize: "10px", color: "#ef4444", lineHeight: 1.5 }}>
-                  {createError}
-                </div>
-              )}
+              {panelFormError && <div className="panel-form-error">{panelFormError}</div>}
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
-                <button type="button" className="btn-slim" onClick={() => setShowAddModal(false)}>
-                  Hủy
+              <div className="panel-form-actions">
+                <button type="button" className="btn-slim" onClick={closePanelForm}>
+                  Cancel
                 </button>
                 <button type="submit" className="btn-slim" style={{ borderColor: "var(--text-primary)" }}>
-                  Tạo Panel
+                  {panelFormMode === "create" ? "Create Panel" : "Save Changes"}
                 </button>
               </div>
             </form>

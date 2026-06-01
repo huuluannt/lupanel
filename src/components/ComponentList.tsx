@@ -47,7 +47,7 @@ export default function ComponentList({
   if (components.length === 0) {
     return (
       <div className="empty-state">
-        This panel is empty. Use <strong>+ Add Component</strong> in the header to add content.
+        This panel is empty. Use <strong>+ Add</strong> in the header to add content.
       </div>
     );
   }

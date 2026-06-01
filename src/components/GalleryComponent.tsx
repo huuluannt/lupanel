@@ -20,6 +20,8 @@ interface GalleryComponentProps {
 }
 
 const createGalleryImageId = () => `gallery-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const galleryImageDragType = "application/x-lupanel-gallery-image";
+const galleryEndDropTarget = "__gallery_end__";
 
 const normalizeGalleryData = (value: string): GalleryData => {
   if (!value) return { images: [] };
@@ -54,8 +56,13 @@ export default function GalleryComponent({
   const [error, setError] = useState<string | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<GalleryImage | null>(null);
+  const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
+  const [dragOverTargetId, setDragOverTargetId] = useState<string | null>(null);
 
   const imagesRef = useRef(images);
+  const dragSourceIdRef = useRef<string | null>(null);
+  const dragOrderRef = useRef<GalleryImage[] | null>(null);
+  const didPreviewReorderRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -68,6 +75,58 @@ export default function GalleryComponent({
     imagesRef.current = nextImages;
     setImages(nextImages);
     onChange(JSON.stringify({ images: nextImages }));
+  };
+
+  const moveImageBefore = (sourceImages: GalleryImage[], draggedId: string, targetId: string) => {
+    const fromIndex = sourceImages.findIndex((image) => image.id === draggedId);
+    const toIndex = sourceImages.findIndex((image) => image.id === targetId);
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return sourceImages;
+
+    const nextImages = [...sourceImages];
+    const [movedImage] = nextImages.splice(fromIndex, 1);
+    nextImages.splice(toIndex, 0, movedImage);
+    return nextImages;
+  };
+
+  const moveImageToEnd = (sourceImages: GalleryImage[], draggedId: string) => {
+    const fromIndex = sourceImages.findIndex((image) => image.id === draggedId);
+    if (fromIndex === -1 || fromIndex === sourceImages.length - 1) return sourceImages;
+
+    const nextImages = [...sourceImages];
+    const [movedImage] = nextImages.splice(fromIndex, 1);
+    nextImages.push(movedImage);
+    return nextImages;
+  };
+
+  const isInternalImageDrag = (event: React.DragEvent) => {
+    return Boolean(dragSourceIdRef.current || Array.from(event.dataTransfer.types).includes(galleryImageDragType));
+  };
+
+  const resetImageDragState = () => {
+    dragSourceIdRef.current = null;
+    dragOrderRef.current = null;
+    didPreviewReorderRef.current = false;
+    setDraggedImageId(null);
+    setDragOverTargetId(null);
+  };
+
+  const previewImageReorder = (targetId: string) => {
+    const draggedId = dragSourceIdRef.current;
+    if (!draggedId) return;
+
+    setDragOverTargetId(targetId);
+
+    const currentOrder = dragOrderRef.current ?? imagesRef.current;
+    const nextOrder =
+      targetId === galleryEndDropTarget
+        ? moveImageToEnd(currentOrder, draggedId)
+        : moveImageBefore(currentOrder, draggedId, targetId);
+
+    if (nextOrder === currentOrder) return;
+
+    dragOrderRef.current = nextOrder;
+    didPreviewReorderRef.current = true;
+    setImages(nextOrder);
   };
 
   const uploadFiles = async (files: File[]) => {
@@ -116,6 +175,12 @@ export default function GalleryComponent({
   };
 
   const handleDrag = (event: React.DragEvent<HTMLDivElement>) => {
+    if (isInternalImageDrag(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
     if (event.type === "dragenter" || event.type === "dragover") {
@@ -126,6 +191,18 @@ export default function GalleryComponent({
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (isInternalImageDrag(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (dragSourceIdRef.current) {
+        if (didPreviewReorderRef.current) {
+          publishImages(dragOrderRef.current ?? imagesRef.current);
+        }
+        resetImageDragState();
+      }
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
     setDragActive(false);
@@ -150,6 +227,57 @@ export default function GalleryComponent({
 
   const updateCaption = (id: string, caption: string) => {
     publishImages(images.map((image) => (image.id === id ? { ...image, caption } : image)));
+  };
+
+  const handleImageDragStart = (event: React.DragEvent<HTMLButtonElement>, imageId: string) => {
+    event.stopPropagation();
+    dragSourceIdRef.current = imageId;
+    dragOrderRef.current = imagesRef.current;
+    didPreviewReorderRef.current = false;
+    setDraggedImageId(imageId);
+    setDragOverTargetId(imageId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(galleryImageDragType, imageId);
+    event.dataTransfer.setData("text/plain", imageId);
+  };
+
+  const handleImageDragOver = (event: React.DragEvent<HTMLDivElement>, imageId: string) => {
+    if (!dragSourceIdRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    previewImageReorder(imageId);
+  };
+
+  const handleImageDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragSourceIdRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    publishImages(dragOrderRef.current ?? imagesRef.current);
+    resetImageDragState();
+  };
+
+  const handleImageDragEnd = () => {
+    if (didPreviewReorderRef.current) {
+      setImages(imagesRef.current);
+    }
+    resetImageDragState();
+  };
+
+  const handleEndDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
+    if (!dragSourceIdRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    previewImageReorder(galleryEndDropTarget);
+  };
+
+  const handleEndDrop = (event: React.DragEvent<HTMLButtonElement>) => {
+    if (!dragSourceIdRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    publishImages(dragOrderRef.current ?? imagesRef.current);
+    resetImageDragState();
   };
 
   const confirmDelete = () => {
@@ -181,10 +309,20 @@ export default function GalleryComponent({
 
       <div className="gallery-grid">
         {images.map((image, index) => (
-          <div className="gallery-tile" key={image.id}>
+          <div
+            className={`gallery-tile ${draggedImageId === image.id ? "is-dragging" : ""} ${
+              dragOverTargetId === image.id ? "is-drag-target" : ""
+            }`}
+            key={image.id}
+            onDragOver={(event) => handleImageDragOver(event, image.id)}
+            onDrop={handleImageDrop}
+          >
             <button
               type="button"
               className="gallery-photo-button"
+              draggable
+              onDragStart={(event) => handleImageDragStart(event, image.id)}
+              onDragEnd={handleImageDragEnd}
               onClick={() => setViewerIndex(index)}
               title="Open image"
             >
@@ -210,8 +348,12 @@ export default function GalleryComponent({
 
         <button
           type="button"
-          className={`gallery-add-tile ${uploadingCount > 0 ? "is-uploading" : ""}`}
+          className={`gallery-add-tile ${uploadingCount > 0 ? "is-uploading" : ""} ${
+            dragOverTargetId === galleryEndDropTarget ? "is-reorder-target" : ""
+          }`}
           onClick={openFilePicker}
+          onDragOver={handleEndDragOver}
+          onDrop={handleEndDrop}
           aria-label="Add gallery images"
           title="Browse / Drag & Drop / Ctrl+V"
         >

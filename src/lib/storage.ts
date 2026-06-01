@@ -10,8 +10,10 @@ import {
 } from "firebase/firestore";
 
 export interface Panel {
-  id: string; // Slugified ID e.g., 'slsb'
-  title: string; // Panel Title
+  id: string; // Slugified route code e.g., 'slsb'
+  name: string;
+  code: string;
+  title?: string; // Legacy display title
   createdAt: number;
 }
 
@@ -58,6 +60,20 @@ export const slugify = (text: string): string => {
     .replace(/\-\-+/g, "-"); // Replace multiple - with single -
 };
 
+const normalizePanel = (panel: Partial<Panel>, fallbackId = ""): Panel => {
+  const id = slugify(panel.id || panel.code || fallbackId || panel.title || panel.name || "");
+  const code = slugify(panel.code || id);
+  const name = panel.name || panel.title || code || "Untitled Panel";
+
+  return {
+    id: code || id,
+    code: code || id,
+    name,
+    title: panel.title || name,
+    createdAt: typeof panel.createdAt === "number" ? panel.createdAt : Date.now(),
+  };
+};
+
 const createDefaultPanelComponents = (): PanelComponent[] => {
   const timestamp = Date.now();
 
@@ -88,7 +104,7 @@ export const storageProvider = {
         const snapshot = await getDocs(q);
         const list: Panel[] = [];
         snapshot.forEach((docSnap) => {
-          list.push(docSnap.data() as Panel);
+          list.push(normalizePanel(docSnap.data() as Partial<Panel>, docSnap.id));
         });
         return list;
       } catch (e) {
@@ -103,7 +119,7 @@ export const storageProvider = {
       if (stored) {
         try {
           const list = JSON.parse(stored) as Panel[];
-          return list.sort((a, b) => b.createdAt - a.createdAt);
+          return list.map((panel) => normalizePanel(panel)).sort((a, b) => b.createdAt - a.createdAt);
         } catch {
           return [];
         }
@@ -112,13 +128,16 @@ export const storageProvider = {
     return [];
   },
 
-  async createPanel(title: string): Promise<Panel | null> {
-    const id = slugify(title);
+  async createPanel(name: string, rawCode: string): Promise<Panel | null> {
+    const trimmedName = name.trim();
+    const id = slugify(rawCode);
     if (!id) return null;
 
     const newPanel: Panel = {
       id,
-      title,
+      name: trimmedName,
+      code: id,
+      title: trimmedName,
       createdAt: Date.now(),
     };
 
@@ -168,7 +187,7 @@ export const storageProvider = {
         const docRef = doc(db, "panels", id);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
-          return snap.data() as Panel;
+          return normalizePanel(snap.data() as Partial<Panel>, snap.id);
         }
         return null;
       } catch (e) {
@@ -181,7 +200,8 @@ export const storageProvider = {
       const stored = localStorage.getItem("lupanel_panels");
       if (stored) {
         const list = JSON.parse(stored) as Panel[];
-        return list.find((p) => p.id === id) || null;
+        const panel = list.map((item) => normalizePanel(item)).find((p) => p.id === id);
+        return panel || null;
       }
     }
     return null;
@@ -217,6 +237,86 @@ export const storageProvider = {
       }
       localStorage.removeItem(`lupanel_components_${id}`);
     }
+  },
+
+  async updatePanel(currentId: string, name: string, rawCode: string): Promise<Panel | null> {
+    const nextId = slugify(rawCode);
+    const trimmedName = name.trim();
+    if (!nextId || !trimmedName) return null;
+
+    if (isFirebaseConfigured() && db) {
+      try {
+        const firestore = db;
+        const currentRef = doc(firestore, "panels", currentId);
+        const currentSnap = await getDoc(currentRef);
+        if (!currentSnap.exists()) return null;
+
+        if (nextId !== currentId) {
+          const nextSnap = await getDoc(doc(firestore, "panels", nextId));
+          if (nextSnap.exists()) return null;
+        }
+
+        const currentPanel = normalizePanel(currentSnap.data() as Partial<Panel>, currentSnap.id);
+        const nextPanel: Panel = {
+          ...currentPanel,
+          id: nextId,
+          code: nextId,
+          name: trimmedName,
+          title: trimmedName,
+        };
+
+        const batch = writeBatch(firestore);
+
+        if (nextId === currentId) {
+          batch.set(currentRef, nextPanel);
+        } else {
+          const currentComponentsCol = collection(firestore, "panels", currentId, "components");
+          const currentComponentsSnap = await getDocs(currentComponentsCol);
+          batch.set(doc(firestore, "panels", nextId), nextPanel);
+          currentComponentsSnap.forEach((componentDoc) => {
+            batch.set(doc(firestore, "panels", nextId, "components", componentDoc.id), componentDoc.data());
+            batch.delete(componentDoc.ref);
+          });
+          batch.delete(currentRef);
+        }
+
+        await batch.commit();
+        return nextPanel;
+      } catch (e) {
+        console.error("Firebase updatePanel failed", e);
+        throw new StorageError("Khong the cap nhat panel tren Firebase.", e);
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("lupanel_panels");
+      const list = stored ? (JSON.parse(stored) as Panel[]).map((panel) => normalizePanel(panel)) : [];
+      const currentPanel = list.find((panel) => panel.id === currentId);
+      if (!currentPanel) return null;
+      if (nextId !== currentId && list.some((panel) => panel.id === nextId)) return null;
+
+      const nextPanel: Panel = {
+        ...currentPanel,
+        id: nextId,
+        code: nextId,
+        name: trimmedName,
+        title: trimmedName,
+      };
+      const nextList = list.map((panel) => (panel.id === currentId ? nextPanel : panel));
+      localStorage.setItem("lupanel_panels", JSON.stringify(nextList));
+
+      if (nextId !== currentId) {
+        const components = localStorage.getItem(`lupanel_components_${currentId}`);
+        if (components !== null) {
+          localStorage.setItem(`lupanel_components_${nextId}`, components);
+        }
+        localStorage.removeItem(`lupanel_components_${currentId}`);
+      }
+
+      return nextPanel;
+    }
+
+    return null;
   },
 
   // --- COMPONENTS ---

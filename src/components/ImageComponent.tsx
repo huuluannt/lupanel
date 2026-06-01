@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ImageViewer from "./ImageViewer";
 
 interface ImageComponentProps {
@@ -9,16 +9,65 @@ interface ImageComponentProps {
   onUploadImage: (file: File) => Promise<string>;
 }
 
+const imageWidthOptions = [25, 50, 75, 100] as const;
+type ImageWidthPercent = (typeof imageWidthOptions)[number];
+
+interface ImageData {
+  src: string;
+  widthPercent: ImageWidthPercent;
+}
+
+const isImageWidthPercent = (value: unknown): value is ImageWidthPercent => {
+  return typeof value === "number" && imageWidthOptions.includes(value as ImageWidthPercent);
+};
+
+const normalizeImageData = (value: string): ImageData => {
+  if (!value) return { src: "", widthPercent: 100 };
+
+  try {
+    const parsed = JSON.parse(value) as Partial<ImageData>;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return {
+        src: typeof parsed.src === "string" ? parsed.src : "",
+        widthPercent: isImageWidthPercent(parsed.widthPercent) ? parsed.widthPercent : 100,
+      };
+    }
+  } catch {
+    return { src: value, widthPercent: 100 };
+  }
+
+  return { src: value, widthPercent: 100 };
+};
+
+const serializeImageData = (imageData: ImageData) => {
+  if (!imageData.src) return "";
+  return JSON.stringify(imageData);
+};
+
 export default function ImageComponent({ value, onChange, onUploadImage }: ImageComponentProps) {
+  const imageData = useMemo(() => normalizeImageData(value), [value]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(true);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [widthMenuOpen, setWidthMenuOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const editMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!widthMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!editMenuRef.current?.contains(event.target as Node)) {
+        setWidthMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [widthMenuOpen]);
 
   const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -30,7 +79,7 @@ export default function ImageComponent({ value, onChange, onUploadImage }: Image
     setError(null);
     try {
       const url = await onUploadImage(file);
-      onChange(url);
+      onChange(serializeImageData({ src: url, widthPercent: imageData.widthPercent }));
     } catch (err) {
       console.error(err);
       setError("Could not upload the image to Cloudinary. Please try again.");
@@ -39,13 +88,8 @@ export default function ImageComponent({ value, onChange, onUploadImage }: Image
     }
   };
 
-  const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
-    const { naturalWidth, naturalHeight } = event.currentTarget;
-    setIsLandscape(naturalWidth > naturalHeight);
-  };
-
   const handleClick = () => {
-    if (!uploading && !value) {
+    if (!uploading && !imageData.src) {
       fileInputRef.current?.click();
     }
   };
@@ -77,7 +121,7 @@ export default function ImageComponent({ value, onChange, onUploadImage }: Image
   };
 
   const handlePaste = (event: React.ClipboardEvent) => {
-    if (value || uploading) return;
+    if (imageData.src || uploading) return;
 
     const items = event.clipboardData?.items;
     if (!items) return;
@@ -94,14 +138,9 @@ export default function ImageComponent({ value, onChange, onUploadImage }: Image
     }
   };
 
-  const requestDelete = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = () => {
-    onChange("");
-    setDeleteConfirmOpen(false);
+  const updateWidth = (widthPercent: ImageWidthPercent) => {
+    onChange(serializeImageData({ ...imageData, widthPercent }));
+    setWidthMenuOpen(false);
   };
 
   return (
@@ -114,20 +153,52 @@ export default function ImageComponent({ value, onChange, onUploadImage }: Image
         style={{ display: "none" }}
       />
 
-      {value ? (
-        <div className={`image-preview-container ${isLandscape ? "landscape" : "portrait"}`}>
+      {imageData.src ? (
+        <div className="image-preview-container" style={{ width: `${imageData.widthPercent}%` }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={value}
+            src={imageData.src}
             alt="Preview"
             className="image-preview-img"
-            onLoad={handleImageLoad}
             onClick={() => setViewerOpen(true)}
             style={{ cursor: "zoom-in" }}
           />
-          <button className="image-delete-btn" onClick={requestDelete} title="Delete image">
-            X
-          </button>
+          <div className="image-edit-control" ref={editMenuRef}>
+            <button
+              type="button"
+              className="image-edit-btn"
+              onClick={(event) => {
+                event.stopPropagation();
+                setWidthMenuOpen((open) => !open);
+              }}
+              aria-label="Edit image width"
+              aria-expanded={widthMenuOpen}
+              title="Edit image width"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+              </svg>
+            </button>
+
+            {widthMenuOpen && (
+              <div className="image-width-menu">
+                {imageWidthOptions.map((widthPercent) => (
+                  <button
+                    key={widthPercent}
+                    type="button"
+                    className={`image-width-option ${imageData.widthPercent === widthPercent ? "is-active" : ""}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      updateWidth(widthPercent);
+                    }}
+                  >
+                    {widthPercent}%
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div
@@ -170,28 +241,7 @@ export default function ImageComponent({ value, onChange, onUploadImage }: Image
 
       {error && <div style={{ fontSize: "10px", color: "#ef4444", marginTop: "4px" }}>{error}</div>}
 
-      {viewerOpen && <ImageViewer src={value} onClose={() => setViewerOpen(false)} />}
-
-      {deleteConfirmOpen && (
-        <div className="component-confirm-backdrop" role="dialog" aria-modal="true">
-          <div className="component-confirm-modal">
-            <div className="component-confirm-title">Delete this image?</div>
-            <div className="component-confirm-desc">This image will be removed from the component.</div>
-            <div className="component-confirm-actions">
-              <button
-                type="button"
-                className="component-confirm-secondary"
-                onClick={() => setDeleteConfirmOpen(false)}
-              >
-                Cancel
-              </button>
-              <button type="button" className="component-confirm-danger" onClick={confirmDelete}>
-                Delete image
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {viewerOpen && <ImageViewer src={imageData.src} onClose={() => setViewerOpen(false)} />}
     </div>
   );
 }

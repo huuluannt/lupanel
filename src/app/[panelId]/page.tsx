@@ -249,7 +249,8 @@ export default function PanelPage({ params }: PageProps) {
     <div className="layout-container">
       <Header
         mode="panel"
-        panelTitle={panel?.title}
+        panelName={panel?.name}
+        panelCode={panel?.code}
         user={user}
         onLogout={handleLogout}
         onAddComponent={handleAddComponent}

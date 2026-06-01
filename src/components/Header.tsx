@@ -13,6 +13,8 @@ interface UserProfile {
 interface HeaderProps {
   mode: "home" | "panel";
   panelTitle?: string;
+  panelName?: string;
+  panelCode?: string;
   user: UserProfile | null;
   onLogout: () => void;
   // Home mode functions
@@ -26,6 +28,8 @@ interface HeaderProps {
 export default function Header({
   mode,
   panelTitle,
+  panelName,
+  panelCode,
   user,
   onLogout,
   onAddPanel,
@@ -39,6 +43,19 @@ export default function Header({
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const componentMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const renderHeaderTitle = () => {
+    if (mode === "home") {
+      return <span className="logo-label">LuPanel</span>;
+    }
+
+    return (
+      <span className="logo-label header-panel-label">
+        <span className="header-panel-name">{panelName || panelTitle}</span>
+        {panelCode && <span className="header-panel-code">/{panelCode}</span>}
+      </span>
+    );
+  };
 
   // Close menus on click outside
   useEffect(() => {
@@ -82,7 +99,7 @@ export default function Header({
       <div className="header-left">
         <Link href="/" className="header-logo-container">
           <div className="logo-icon">Lu</div>
-          <span className="logo-label">{mode === "home" ? "LuPanel" : panelTitle}</span>
+          {renderHeaderTitle()}
         </Link>
       </div>
 
@@ -120,52 +137,74 @@ export default function Header({
         )}
 
         {mode === "panel" && onAddComponent && (
-          <div className="dropdown-container" ref={componentMenuRef}>
-            <button className="btn-slim" onClick={() => setShowComponentMenu(!showComponentMenu)}>
-              + Add Component
+          <div className="header-component-actions" ref={componentMenuRef}>
+            <button
+              type="button"
+              className="header-icon-btn"
+              onClick={() => {
+                setShowComponentMenu(false);
+                onAddComponent("richtext");
+              }}
+              aria-label="Add Rich Text"
+              title="Add Rich Text"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 7h16" />
+                <path d="M4 12h10" />
+                <path d="M4 17h8" />
+                <path d="M17 14l3 3-3 3" />
+              </svg>
             </button>
+            <button
+              type="button"
+              className="header-icon-btn"
+              onClick={() => {
+                setShowComponentMenu(false);
+                onAddComponent("gallery");
+              }}
+              aria-label="Add Gallery"
+              title="Add Gallery"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                <path d="M17.5 14v7" />
+                <path d="M14 17.5h7" />
+              </svg>
+            </button>
+
+            <div className="dropdown-container">
+              <button className="btn-slim" onClick={() => setShowComponentMenu(!showComponentMenu)}>
+                + Add
+              </button>
             
-            {showComponentMenu && (
-              <div className="dropdown-menu component-dropdown-menu">
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    onAddComponent("title");
-                    setShowComponentMenu(false);
-                  }}
-                >
-                  <span style={{ fontWeight: 600 }}>T</span> Title
-                </button>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    onAddComponent("text");
-                    setShowComponentMenu(false);
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="4" y1="9" x2="20" y2="9"></line>
-                    <line x1="4" y1="15" x2="20" y2="15"></line>
-                    <line x1="10" y1="3" x2="8" y2="21"></line>
-                    <line x1="16" y1="3" x2="14" y2="21"></line>
-                  </svg>
-                  Text
-                </button>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    onAddComponent("richtext");
-                    setShowComponentMenu(false);
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 7h16" />
-                    <path d="M4 12h10" />
-                    <path d="M4 17h8" />
-                    <path d="M17 14l3 3-3 3" />
-                  </svg>
-                  Rich Text
-                </button>
+              {showComponentMenu && (
+                <div className="dropdown-menu component-dropdown-menu">
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      onAddComponent("title");
+                      setShowComponentMenu(false);
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>T</span> Title
+                  </button>
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      onAddComponent("text");
+                      setShowComponentMenu(false);
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="4" y1="9" x2="20" y2="9"></line>
+                      <line x1="4" y1="15" x2="20" y2="15"></line>
+                      <line x1="10" y1="3" x2="8" y2="21"></line>
+                      <line x1="16" y1="3" x2="14" y2="21"></line>
+                    </svg>
+                    Text
+                  </button>
                 <button
                   className="dropdown-item"
                   onClick={() => {
@@ -226,22 +265,6 @@ export default function Header({
                 <button
                   className="dropdown-item"
                   onClick={() => {
-                    onAddComponent("gallery");
-                    setShowComponentMenu(false);
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                    <path d="M17.5 14v7" />
-                    <path d="M14 17.5h7" />
-                  </svg>
-                  Gallery
-                </button>
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
                     onAddComponent("table");
                     setShowComponentMenu(false);
                   }}
@@ -257,6 +280,7 @@ export default function Header({
                 </button>
               </div>
             )}
+            </div>
           </div>
         )}
 
