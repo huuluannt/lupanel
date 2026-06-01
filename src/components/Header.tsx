@@ -173,6 +173,24 @@ export default function Header({
                 <path d="M14 17.5h7" />
               </svg>
             </button>
+            <button
+              type="button"
+              className="header-icon-btn"
+              onClick={() => {
+                setShowComponentMenu(false);
+                onAddComponent("table");
+              }}
+              aria-label="Add Table"
+              title="Add Table"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <path d="M3 9h18" />
+                <path d="M3 15h18" />
+                <path d="M9 3v18" />
+                <path d="M15 3v18" />
+              </svg>
+            </button>
 
             <div className="dropdown-container">
               <button className="btn-slim" onClick={() => setShowComponentMenu(!showComponentMenu)}>
@@ -265,18 +283,15 @@ export default function Header({
                 <button
                   className="dropdown-item"
                   onClick={() => {
-                    onAddComponent("table");
+                    onAddComponent("checkbox");
                     setShowComponentMenu(false);
                   }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <path d="M3 9h18" />
-                    <path d="M3 15h18" />
-                    <path d="M9 3v18" />
-                    <path d="M15 3v18" />
+                    <rect x="3" y="3" width="18" height="18" rx="3" />
+                    <path d="m7 12 3 3 7-7" />
                   </svg>
-                  Table
+                  Checkbox
                 </button>
               </div>
             )}

@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 interface RichTextComponentProps {
   value: string;
   onChange: (newValue: string) => void;
+  autoFocus?: boolean;
+  placeholder?: string;
 }
 
 interface ActiveFormats {
@@ -111,7 +113,12 @@ const getTextPosition = (root: HTMLElement, targetOffset: number) => {
   return lastTextNode ? { node: lastTextNode, offset: lastTextNode.data.length } : null;
 };
 
-export default function RichTextComponent({ value, onChange }: RichTextComponentProps) {
+export default function RichTextComponent({
+  value,
+  onChange,
+  autoFocus = false,
+  placeholder = "Start writing...",
+}: RichTextComponentProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
@@ -153,12 +160,12 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
     editorRef.current?.focus();
   };
 
-  const showToolbar = () => {
+  const showToolbar = useCallback(() => {
     if (hideToolbarTimerRef.current) {
       clearTimeout(hideToolbarTimerRef.current);
     }
     setIsToolbarVisible(true);
-  };
+  }, []);
 
   const runCommand = (command: string, commandValue?: string) => {
     focusEditor();
@@ -334,6 +341,17 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
   }, [initialValue]);
 
   useEffect(() => {
+    if (!autoFocus) return;
+
+    const timer = window.setTimeout(() => {
+      editorRef.current?.focus();
+      showToolbar();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [autoFocus, showToolbar]);
+
+  useEffect(() => {
     if (isLinkDialogOpen) {
       linkInputRef.current?.focus();
     }
@@ -432,7 +450,7 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
         contentEditable
         role="textbox"
         aria-label="Rich text"
-        data-placeholder="Start writing..."
+        data-placeholder={placeholder}
         suppressContentEditableWarning
         onInput={handleInput}
         onKeyUp={updateActiveFormats}

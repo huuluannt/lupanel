@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import LoginScreen from "../components/LoginScreen";
-import { Panel, storageProvider } from "../lib/storage";
+import { Panel, slugify, storageProvider } from "../lib/storage";
 import { auth, isFirebaseConfigured } from "../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
@@ -153,12 +153,17 @@ export default function Home() {
 
     const trimmedName = panelName.trim();
     const trimmedCode = panelCode.trim();
+    const normalizedCode = slugify(trimmedCode);
     if (!trimmedName) {
       setPanelFormError("Name is required.");
       return;
     }
-    if (!trimmedCode) {
-      setPanelFormError("Code is required.");
+    if (!trimmedCode || !normalizedCode) {
+      setPanelFormError("ID Link is required.");
+      return;
+    }
+    if (panels.some((panel) => panel.code === normalizedCode && panel.id !== editingPanel?.id)) {
+      setPanelFormError("ID Link already exists. Choose a unique ID Link.");
       return;
     }
 
@@ -166,7 +171,7 @@ export default function Home() {
       if (panelFormMode === "create") {
         const created = await storageProvider.createPanel(trimmedName, trimmedCode);
         if (!created) {
-          setPanelFormError("Code already exists or is invalid.");
+          setPanelFormError("ID Link already exists or is invalid.");
           return;
         }
         closePanelForm();
@@ -177,7 +182,7 @@ export default function Home() {
       if (!editingPanel) return;
       const updated = await storageProvider.updatePanel(editingPanel.id, trimmedName, trimmedCode);
       if (!updated) {
-        setPanelFormError("Code already exists or is invalid.");
+        setPanelFormError("ID Link already exists or is invalid.");
         return;
       }
       closePanelForm();
@@ -208,6 +213,10 @@ export default function Home() {
     if (!query) return true;
     return panel.name.toLowerCase().includes(query) || panel.code.toLowerCase().includes(query);
   });
+  const normalizedPanelCode = slugify(panelCode);
+  const isPanelCodeDuplicate = Boolean(
+    normalizedPanelCode && panels.some((panel) => panel.code === normalizedPanelCode && panel.id !== editingPanel?.id)
+  );
 
   if (loading) {
     return (
@@ -301,7 +310,7 @@ export default function Home() {
                 <input
                   type="text"
                   autoFocus
-                  placeholder="Hoi nghi Khoa hoc quoc te FBB"
+                  placeholder="Title"
                   value={panelName}
                   onChange={(event) => setPanelName(event.target.value)}
                 />
@@ -310,10 +319,13 @@ export default function Home() {
                 <label>Code</label>
                 <input
                   type="text"
-                  placeholder="SLSB"
+                  placeholder="ID Link"
                   value={panelCode}
                   onChange={(event) => setPanelCode(event.target.value)}
                 />
+                {isPanelCodeDuplicate && (
+                  <div className="panel-form-error">ID Link already exists. Choose a unique ID Link.</div>
+                )}
               </div>
 
               {panelFormError && <div className="panel-form-error">{panelFormError}</div>}
@@ -322,7 +334,12 @@ export default function Home() {
                 <button type="button" className="btn-slim" onClick={closePanelForm}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-slim" style={{ borderColor: "var(--text-primary)" }}>
+                <button
+                  type="submit"
+                  className="btn-slim"
+                  style={{ borderColor: "var(--text-primary)" }}
+                  disabled={isPanelCodeDuplicate}
+                >
                   {panelFormMode === "create" ? "Create Panel" : "Save Changes"}
                 </button>
               </div>

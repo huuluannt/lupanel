@@ -197,9 +197,12 @@ export default function ImageViewer({
   const handleCanvasClick = (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!clickStartPos.current) return;
+    if (event.target !== event.currentTarget) return;
+
     const dx = Math.abs(event.clientX - clickStartPos.current.x);
     const dy = Math.abs(event.clientY - clickStartPos.current.y);
     if (dx >= 4 || dy >= 4) return;
+    onClose();
   };
 
   return (
@@ -293,7 +296,10 @@ export default function ImageViewer({
         onWheel={handleWheel}
         onMouseDown={(event) => {
           event.stopPropagation();
-          handleMouseDown(event);
+          handleBackdropMouseDown(event);
+          if (event.target !== event.currentTarget) {
+            handleMouseDown(event);
+          }
         }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

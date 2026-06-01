@@ -111,6 +111,11 @@ input, textarea {
   background-color: var(--bg-hover-strong);
 }
 
+.btn-slim:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 /* Layout elements */
 .layout-container {
   display: flex;
@@ -901,6 +906,106 @@ input, textarea {
 .richtext-editor ul,
 .richtext-editor ol {
   padding-left: 20px;
+}
+
+/* Checkbox Component */
+.checkbox-component-wrapper {
+  width: min(100%, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkbox-row {
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  padding: 1px 2px;
+  transition: background-color 0.15s ease;
+}
+
+.checkbox-row:hover {
+  background-color: var(--bg-hover);
+}
+
+.checkbox-toggle {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-focus);
+  border-radius: 4px;
+  color: #ffffff;
+  background-color: #ffffff;
+}
+
+.checkbox-row.is-checked .checkbox-toggle {
+  border-color: #111111;
+  background-color: #111111;
+}
+
+.checkbox-toggle svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.checkbox-text-input {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--text-primary);
+  background-color: transparent;
+  font-size: var(--font-size-base);
+  font-weight: 300;
+  line-height: 24px;
+}
+
+.checkbox-text-input::placeholder {
+  color: var(--text-muted);
+}
+
+.checkbox-text-input:focus {
+  border-bottom-color: var(--border-light);
+}
+
+.checkbox-row.is-checked .checkbox-text-input {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: currentColor;
+}
+
+.checkbox-delete-row-btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.checkbox-row:hover .checkbox-delete-row-btn,
+.checkbox-delete-row-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.checkbox-delete-row-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+  background-color: var(--bg-hover-strong);
 }
 
 /* Table Component */
@@ -1902,6 +2007,7 @@ input, textarea {
   z-index: 20;
   display: flex;
   align-items: center;
+  gap: 6px;
   pointer-events: none;
 }
 
@@ -1924,11 +2030,19 @@ input, textarea {
   background-color: var(--bg-hover);
 }
 
-.component-inner-title-input {
+.component-inner-title-row {
   width: min(100%, 520px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.component-inner-title-input {
+  flex: 1;
+  min-width: 0;
   height: 30px;
   display: block;
-  margin-bottom: 6px;
   border: none;
   border-bottom: 1px solid transparent;
   color: var(--text-primary);
@@ -1945,6 +2059,38 @@ input, textarea {
 .component-inner-title-input:hover,
 .component-inner-title-input:focus {
   border-bottom-color: var(--border-light);
+}
+
+.component-inner-richtext {
+  width: min(100%, 760px);
+  position: relative;
+  margin-top: 6px;
+  padding-right: 30px;
+}
+
+.component-inner-remove-btn {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background-color: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.component-inner-remove-btn:hover {
+  border-color: var(--border-light);
+  color: var(--text-primary);
+  background-color: var(--bg-hover-strong);
+}
+
+.component-inner-richtext-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 0;
 }
 
 .component-delete-btn {

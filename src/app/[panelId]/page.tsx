@@ -6,6 +6,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import ComponentList from "../../components/ComponentList";
 import Header from "../../components/Header";
 import LoginScreen from "../../components/LoginScreen";
+import { createDefaultCheckboxValue } from "../../components/CheckboxComponent";
 import { Panel, PanelComponent, storageProvider } from "../../lib/storage";
 import { auth, isFirebaseConfigured } from "../../lib/firebase";
 
@@ -32,6 +33,10 @@ const getDefaultComponentValue = (type: ComponentType) => {
 
   if (type === "file") {
     return JSON.stringify({ files: [] });
+  }
+
+  if (type === "checkbox") {
+    return createDefaultCheckboxValue();
   }
 
   return "";
@@ -181,10 +186,33 @@ export default function PanelPage({ params }: PageProps) {
     await saveComponents(updated);
   };
 
-  const handleComponentTitleChange = async (id: string, title: string) => {
+  const handleComponentTitleChange = async (id: string, title: string | undefined) => {
     const updated = components.map((component) => {
       if (component.id === id) {
+        if (title === undefined) {
+          const nextComponent = { ...component };
+          delete nextComponent.title;
+          return nextComponent;
+        }
+
         return { ...component, title };
+      }
+      return component;
+    });
+
+    await saveComponents(updated);
+  };
+
+  const handleComponentRichTextChange = async (id: string, richText: string | undefined) => {
+    const updated = components.map((component) => {
+      if (component.id === id) {
+        if (richText === undefined) {
+          const nextComponent = { ...component };
+          delete nextComponent.richText;
+          return nextComponent;
+        }
+
+        return { ...component, richText };
       }
       return component;
     });
@@ -277,6 +305,7 @@ export default function PanelPage({ params }: PageProps) {
           components={components}
           onComponentChange={handleComponentChange}
           onComponentTitleChange={handleComponentTitleChange}
+          onComponentRichTextChange={handleComponentRichTextChange}
           onDeleteComponent={handleDeleteComponent}
           onMoveComponentUp={(id) => void handleMoveComponent(id, "up")}
           onMoveComponentDown={(id) => void handleMoveComponent(id, "down")}

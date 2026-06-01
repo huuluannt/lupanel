@@ -19,8 +19,9 @@ export interface Panel {
 
 export interface PanelComponent {
   id: string;
-  type: "title" | "text" | "richtext" | "image" | "file" | "url" | "youtube" | "table" | "gallery";
+  type: "title" | "text" | "richtext" | "image" | "file" | "url" | "youtube" | "table" | "gallery" | "checkbox";
   title?: string;
+  richText?: string;
   value: string; // Text string, URL string, base64/remote image URL, or JSON for complex component state
   order: number;
 }
