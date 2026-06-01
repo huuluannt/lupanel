@@ -20,6 +20,16 @@ const DEFAULT_COLS = 2;
 const MIN_COL_WIDTH = 84;
 const MIN_ROW_HEIGHT = 28;
 const ROW_HEADER_WIDTH = 34;
+const TABLE_URL_PATTERN =
+  /((?:(?:https?:\/\/|www\.)[^\s<]+)|(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?:\/[^\s<]*)?))/gi;
+const TRAILING_URL_PUNCTUATION_PATTERN = /[.,!?;:]+$/;
+
+const normalizeCellUrl = (url: string) => {
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) return "";
+  if (/^https?:\/\//i.test(trimmedUrl)) return trimmedUrl;
+  return `https://${trimmedUrl}`;
+};
 
 const createEmptyRows = (rows: number, cols: number): string[][] => {
   return Array.from({ length: rows }, () => Array.from({ length: cols }, () => ""));
@@ -92,6 +102,56 @@ const getColumnLabel = (index: number) => {
   return label;
 };
 
+const getCellKey = (rowIndex: number, colIndex: number) => `${rowIndex}:${colIndex}`;
+
+const cellContainsUrl = (text: string) => {
+  TABLE_URL_PATTERN.lastIndex = 0;
+  return TABLE_URL_PATTERN.test(text);
+};
+
+const renderCellTextWithLinks = (text: string) => {
+  if (!text) return null;
+
+  TABLE_URL_PATTERN.lastIndex = 0;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = TABLE_URL_PATTERN.exec(text)) !== null) {
+    const rawUrl = match[0];
+    const matchIndex = match.index;
+    const urlText = rawUrl.replace(TRAILING_URL_PUNCTUATION_PATTERN, "");
+    const trailingText = rawUrl.slice(urlText.length);
+    const href = normalizeCellUrl(urlText);
+
+    if (matchIndex > lastIndex) {
+      parts.push(text.slice(lastIndex, matchIndex));
+    }
+
+    if (href) {
+      parts.push(
+        <a key={`${matchIndex}-${urlText}`} href={href} target="_blank" rel="noreferrer">
+          {urlText}
+        </a>
+      );
+    } else {
+      parts.push(rawUrl);
+    }
+
+    if (trailingText) {
+      parts.push(trailingText);
+    }
+
+    lastIndex = matchIndex + rawUrl.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+};
+
 const Icon = ({ type }: { type: "trash" | "left" | "right" | "up" | "down" }) => {
   if (type === "trash") {
     return (
@@ -115,8 +175,10 @@ const Icon = ({ type }: { type: "trash" | "left" | "right" | "up" | "down" }) =>
 
 const TableComponent = ({ value, onChange }: TableComponentProps) => {
   const [tableData, setTableData] = useState<TableData>(() => normalizeTableData(value));
+  const [activeCell, setActiveCell] = useState<{ rowIndex: number; colIndex: number } | null>(null);
   const lastPublishedValue = useRef(value);
   const scrollShellRef = useRef<HTMLDivElement>(null);
+  const cellInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const resizingState = useRef<{
     type: "col" | "row";
     index: number;
@@ -170,6 +232,16 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
         rIdx === rowIndex ? row.map((cell, cIdx) => (cIdx === colIndex ? text : cell)) : row
       );
       return { ...current, rows };
+    });
+  };
+
+  const focusCell = (rowIndex: number, colIndex: number) => {
+    const cellKey = getCellKey(rowIndex, colIndex);
+    setActiveCell({ rowIndex, colIndex });
+    window.requestAnimationFrame(() => {
+      const textarea = cellInputRefs.current[cellKey];
+      textarea?.focus();
+      textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
     });
   };
 
@@ -353,14 +425,29 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
               {row.map((cell, colIndex) => (
                 <div
                   key={`cell-${rowIndex}-${colIndex}`}
-                  className="table-cell-wrapper"
+                  className={`table-cell-wrapper ${
+                    activeCell?.rowIndex === rowIndex && activeCell?.colIndex === colIndex ? "is-editing" : ""
+                  } ${cellContainsUrl(cell) ? "has-link" : ""}`}
                   style={{ height: `${tableData.rowHeights[rowIndex]}px` }}
+                  onMouseDown={(event) => {
+                    const target = event.target as HTMLElement;
+                    if (target.closest("a") || target.closest("textarea")) return;
+                    event.preventDefault();
+                    focusCell(rowIndex, colIndex);
+                  }}
                 >
+                  <div className="table-cell-display">{renderCellTextWithLinks(cell)}</div>
                   <textarea
+                    ref={(element) => {
+                      cellInputRefs.current[getCellKey(rowIndex, colIndex)] = element;
+                    }}
                     className="table-cell-input"
                     value={cell}
                     onChange={(event) => updateCellValue(rowIndex, colIndex, event.target.value)}
                     onPaste={(event) => handlePaste(event, rowIndex, colIndex)}
+                    onFocus={() => setActiveCell({ rowIndex, colIndex })}
+                    onBlur={() => setActiveCell(null)}
+                    spellCheck={false}
                     aria-label={`Cell ${getColumnLabel(colIndex)}${rowIndex + 1}`}
                   />
                 </div>

@@ -15,6 +15,7 @@ import TableComponent from "./TableComponent";
 interface ComponentListProps {
   components: PanelComponent[];
   onComponentChange: (id: string, value: string) => void;
+  onComponentTitleChange: (id: string, title: string) => void;
   onDeleteComponent: (id: string) => void;
   onMoveComponentUp: (id: string) => void;
   onMoveComponentDown: (id: string) => void;
@@ -26,6 +27,7 @@ interface ComponentListProps {
 export default function ComponentList({
   components,
   onComponentChange,
+  onComponentTitleChange,
   onDeleteComponent,
   onMoveComponentUp,
   onMoveComponentDown,
@@ -34,6 +36,7 @@ export default function ComponentList({
   onSelectComponent,
 }: ComponentListProps) {
   const componentRefs = useRef<Record<string, { focus?: () => void } | null>>({});
+  const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [pendingDeleteComponent, setPendingDeleteComponent] = useState<PanelComponent | null>(null);
 
   const handleFocusNext = (currentIndex: number) => {
@@ -42,6 +45,13 @@ export default function ComponentList({
       const nextRef = componentRefs.current[nextComp.id];
       nextRef?.focus?.();
     }
+  };
+
+  const handleAddTitle = (componentId: string) => {
+    onComponentTitleChange(componentId, "");
+    window.setTimeout(() => {
+      titleInputRefs.current[componentId]?.focus();
+    }, 0);
   };
 
   if (components.length === 0) {
@@ -85,6 +95,30 @@ export default function ComponentList({
           </div>
 
           <div className="component-content-wrapper">
+            {selectedComponentId === comp.id && comp.title === undefined && comp.type !== "title" && (
+              <div className="component-title-toolbar">
+                <button
+                  type="button"
+                  className="component-title-toolbar-btn"
+                  onClick={() => handleAddTitle(comp.id)}
+                >
+                  + Add Title
+                </button>
+              </div>
+            )}
+
+            {comp.title !== undefined && (
+              <input
+                ref={(element) => {
+                  titleInputRefs.current[comp.id] = element;
+                }}
+                className="component-inner-title-input"
+                value={comp.title}
+                onChange={(event) => onComponentTitleChange(comp.id, event.target.value)}
+                placeholder="Title"
+              />
+            )}
+
             {comp.type === "title" && (
               <TitleComponent
                 value={comp.value}

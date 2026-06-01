@@ -20,6 +20,7 @@ export interface Panel {
 export interface PanelComponent {
   id: string;
   type: "title" | "text" | "richtext" | "image" | "file" | "url" | "youtube" | "table" | "gallery";
+  title?: string;
   value: string; // Text string, URL string, base64/remote image URL, or JSON for complex component state
   order: number;
 }
@@ -85,8 +86,8 @@ const createDefaultPanelComponents = (): PanelComponent[] => {
       order: 0,
     },
     {
-      id: `text-${timestamp}`,
-      type: "text",
+      id: `richtext-${timestamp}`,
+      type: "richtext",
       value: "",
       order: 1,
     },

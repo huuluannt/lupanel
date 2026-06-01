@@ -181,6 +181,17 @@ export default function PanelPage({ params }: PageProps) {
     await saveComponents(updated);
   };
 
+  const handleComponentTitleChange = async (id: string, title: string) => {
+    const updated = components.map((component) => {
+      if (component.id === id) {
+        return { ...component, title };
+      }
+      return component;
+    });
+
+    await saveComponents(updated);
+  };
+
   const handleDeleteComponent = async (id: string) => {
     if (selectedComponentId === id) {
       setSelectedComponentId(null);
@@ -265,6 +276,7 @@ export default function PanelPage({ params }: PageProps) {
         <ComponentList
           components={components}
           onComponentChange={handleComponentChange}
+          onComponentTitleChange={handleComponentTitleChange}
           onDeleteComponent={handleDeleteComponent}
           onMoveComponentUp={(id) => void handleMoveComponent(id, "up")}
           onMoveComponentDown={(id) => void handleMoveComponent(id, "down")}

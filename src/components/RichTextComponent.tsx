@@ -21,6 +21,10 @@ const DEFAULT_FORMATS: ActiveFormats = {
   highlight: false,
 };
 
+const URL_BEFORE_CARET_PATTERN =
+  /(?:^|\s)((?:(?:https?:\/\/|www\.)[^\s<]+)|(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?:\/[^\s<]*)?))$/i;
+const TRAILING_URL_PUNCTUATION_PATTERN = /[.,!?;:]+$/;
+
 const normalizeUrl = (url: string) => {
   const trimmedUrl = url.trim();
   if (!trimmedUrl) return "";
@@ -77,6 +81,34 @@ const sanitizeHtml = (html: string) => {
   });
 
   return template.innerHTML;
+};
+
+const closestAnchor = (node: Node | null) => {
+  const element = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node instanceof Element ? node : null;
+  return element?.closest("a") ?? null;
+};
+
+const getTextPosition = (root: HTMLElement, targetOffset: number) => {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let currentOffset = 0;
+  let lastTextNode: Text | null = null;
+
+  while (walker.nextNode()) {
+    const textNode = walker.currentNode as Text;
+    const nextOffset = currentOffset + textNode.data.length;
+    lastTextNode = textNode;
+
+    if (targetOffset <= nextOffset) {
+      return {
+        node: textNode,
+        offset: Math.max(0, targetOffset - currentOffset),
+      };
+    }
+
+    currentOffset = nextOffset;
+  }
+
+  return lastTextNode ? { node: lastTextNode, offset: lastTextNode.data.length } : null;
 };
 
 export default function RichTextComponent({ value, onChange }: RichTextComponentProps) {
@@ -198,6 +230,51 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
     closeLinkDialog();
   };
 
+  const autoLinkUrlBeforeCaret = () => {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (!editor || !selection || selection.rangeCount === 0 || !selection.isCollapsed) return;
+
+    const caretRange = selection.getRangeAt(0);
+    if (!editor.contains(caretRange.commonAncestorContainer) || closestAnchor(caretRange.startContainer)) return;
+
+    const textBeforeCaretRange = caretRange.cloneRange();
+    textBeforeCaretRange.selectNodeContents(editor);
+    textBeforeCaretRange.setEnd(caretRange.endContainer, caretRange.endOffset);
+
+    const textBeforeCaret = textBeforeCaretRange.toString();
+    const match = textBeforeCaret.match(URL_BEFORE_CARET_PATTERN);
+    if (!match) return;
+
+    const rawUrl = match[1];
+    const urlText = rawUrl.replace(TRAILING_URL_PUNCTUATION_PATTERN, "");
+    const href = normalizeUrl(urlText);
+    if (!urlText || !href) return;
+
+    const urlStartOffset = textBeforeCaret.length - rawUrl.length;
+    const urlEndOffset = urlStartOffset + urlText.length;
+    const startPosition = getTextPosition(editor, urlStartOffset);
+    const endPosition = getTextPosition(editor, urlEndOffset);
+    if (!startPosition || !endPosition || closestAnchor(startPosition.node) || closestAnchor(endPosition.node)) return;
+
+    const linkRange = document.createRange();
+    linkRange.setStart(startPosition.node, startPosition.offset);
+    linkRange.setEnd(endPosition.node, endPosition.offset);
+
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.target = "_blank";
+    anchor.rel = "noreferrer";
+    anchor.appendChild(linkRange.extractContents());
+    linkRange.insertNode(anchor);
+
+    const nextRange = document.createRange();
+    nextRange.setStartAfter(anchor);
+    nextRange.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(nextRange);
+  };
+
   const clearFormatting = () => {
     runCommand("removeFormat");
   };
@@ -213,6 +290,13 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
     event.preventDefault();
     document.execCommand("insertText", false, text);
     schedulePublish();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === " " || event.key === "Enter") {
+      autoLinkUrlBeforeCaret();
+    }
   };
 
   const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -352,6 +436,7 @@ export default function RichTextComponent({ value, onChange }: RichTextComponent
         suppressContentEditableWarning
         onInput={handleInput}
         onKeyUp={updateActiveFormats}
+        onKeyDown={handleKeyDown}
         onMouseUp={updateActiveFormats}
         onClick={handleEditorClick}
         onPaste={handlePaste}
