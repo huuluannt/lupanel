@@ -18,6 +18,11 @@ type CellPosition = {
   colIndex: number;
 };
 
+type CellSelectionRange = {
+  start: CellPosition;
+  end: CellPosition;
+};
+
 type PendingTableDelete = {
   type: "row" | "column";
   index: number;
@@ -114,6 +119,30 @@ const getColumnLabel = (index: number) => {
 
 const getCellKey = (rowIndex: number, colIndex: number) => `${rowIndex}:${colIndex}`;
 
+const normalizeCellSelectionRange = (range: CellSelectionRange) => ({
+  startRow: Math.min(range.start.rowIndex, range.end.rowIndex),
+  endRow: Math.max(range.start.rowIndex, range.end.rowIndex),
+  startCol: Math.min(range.start.colIndex, range.end.colIndex),
+  endCol: Math.max(range.start.colIndex, range.end.colIndex),
+});
+
+const isCellInSelectionRange = (rowIndex: number, colIndex: number, range: CellSelectionRange | null) => {
+  if (!range) return false;
+  const normalizedRange = normalizeCellSelectionRange(range);
+  return (
+    rowIndex >= normalizedRange.startRow &&
+    rowIndex <= normalizedRange.endRow &&
+    colIndex >= normalizedRange.startCol &&
+    colIndex <= normalizedRange.endCol
+  );
+};
+
+const formatSpreadsheetCell = (value: string) => {
+  const normalizedValue = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!/["\t\n]/.test(normalizedValue)) return normalizedValue;
+  return `"${normalizedValue.replace(/"/g, '""')}"`;
+};
+
 const cellContainsUrl = (text: string) => {
   TABLE_URL_PATTERN.lastIndex = 0;
   return TABLE_URL_PATTERN.test(text);
@@ -186,11 +215,16 @@ const Icon = ({ type }: { type: "trash" | "left" | "right" | "up" | "down" }) =>
 const TableComponent = ({ value, onChange }: TableComponentProps) => {
   const [tableData, setTableData] = useState<TableData>(() => normalizeTableData(value));
   const [activeCell, setActiveCell] = useState<CellPosition | null>(null);
+  const [cellSelection, setCellSelection] = useState<CellSelectionRange | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingTableDelete>(null);
   const lastPublishedValue = useRef(value);
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
   const scrollShellRef = useRef<HTMLDivElement>(null);
   const cellInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const pendingFocusRef = useRef<CellPosition | null>(null);
+  const selectionAnchorRef = useRef<CellPosition | null>(null);
+  const isSelectingCellsRef = useRef(false);
+  const hasSelectionDragRef = useRef(false);
   const resizingState = useRef<{
     type: "col" | "row";
     index: number;
@@ -249,6 +283,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
 
   const focusCell = (rowIndex: number, colIndex: number) => {
     const cellKey = getCellKey(rowIndex, colIndex);
+    setCellSelection(null);
     setActiveCell({ rowIndex, colIndex });
     window.requestAnimationFrame(() => {
       const textarea = cellInputRefs.current[cellKey];
@@ -256,6 +291,32 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
       textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
     });
   };
+
+  useEffect(() => {
+    const finishCellSelection = () => {
+      if (!isSelectingCellsRef.current) return;
+
+      isSelectingCellsRef.current = false;
+      const anchor = selectionAnchorRef.current;
+      selectionAnchorRef.current = null;
+
+      if (!hasSelectionDragRef.current && anchor) {
+        setCellSelection(null);
+        focusCell(anchor.rowIndex, anchor.colIndex);
+      } else {
+        tableWrapperRef.current?.focus({ preventScroll: true });
+      }
+
+      hasSelectionDragRef.current = false;
+    };
+
+    window.addEventListener("pointerup", finishCellSelection);
+    window.addEventListener("pointercancel", finishCellSelection);
+    return () => {
+      window.removeEventListener("pointerup", finishCellSelection);
+      window.removeEventListener("pointercancel", finishCellSelection);
+    };
+  }, []);
 
   const focusCellWhenReady = (rowIndex: number, colIndex: number) => {
     pendingFocusRef.current = { rowIndex, colIndex };
@@ -297,6 +358,67 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
     });
   };
 
+  const startCellSelection = (
+    event: React.PointerEvent<HTMLDivElement>,
+    rowIndex: number,
+    colIndex: number
+  ) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("a")) return;
+    if (
+      target.closest("textarea") &&
+      activeCell?.rowIndex === rowIndex &&
+      activeCell?.colIndex === colIndex &&
+      !event.shiftKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    const currentCell = { rowIndex, colIndex };
+    const anchorCell = event.shiftKey && (cellSelection?.start || activeCell)
+      ? cellSelection?.start ?? activeCell ?? currentCell
+      : currentCell;
+
+    selectionAnchorRef.current = anchorCell;
+    isSelectingCellsRef.current = true;
+    hasSelectionDragRef.current = event.shiftKey;
+    setActiveCell(null);
+    setCellSelection({ start: anchorCell, end: currentCell });
+  };
+
+  const extendCellSelection = (rowIndex: number, colIndex: number) => {
+    if (!isSelectingCellsRef.current || !selectionAnchorRef.current) return;
+
+    const nextCell = { rowIndex, colIndex };
+    const currentEnd = cellSelection?.end;
+    if (currentEnd?.rowIndex === rowIndex && currentEnd.colIndex === colIndex) return;
+
+    hasSelectionDragRef.current = true;
+    setActiveCell(null);
+    setCellSelection({ start: selectionAnchorRef.current, end: nextCell });
+  };
+
+  const getSelectionText = (range: CellSelectionRange) => {
+    const normalizedRange = normalizeCellSelectionRange(range);
+    return tableData.rows
+      .slice(normalizedRange.startRow, normalizedRange.endRow + 1)
+      .map((row) =>
+        row
+          .slice(normalizedRange.startCol, normalizedRange.endCol + 1)
+          .map(formatSpreadsheetCell)
+          .join("\t")
+      )
+      .join("\n");
+  };
+
+  const handleCopySelection = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!cellSelection) return;
+
+    event.preventDefault();
+    event.clipboardData.setData("text/plain", getSelectionText(cellSelection));
+  };
+
   const addRowAt = (index: number) => {
     setTableData((current) => {
       const cols = current.rows[0]?.length ?? DEFAULT_COLS;
@@ -313,6 +435,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
 
   const removeRowAt = (index: number) => {
     setActiveCell(null);
+    setCellSelection(null);
     setTableData((current) => {
       if (current.rows.length <= 1) return current;
       return {
@@ -334,6 +457,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
 
   const removeColAt = (index: number) => {
     setActiveCell(null);
+    setCellSelection(null);
     setTableData((current) => {
       if ((current.rows[0]?.length ?? 0) <= 1) return current;
       return {
@@ -483,7 +607,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
   }, []);
 
   return (
-    <div className="table-component-wrapper">
+    <div className="table-component-wrapper" ref={tableWrapperRef} tabIndex={0} onCopy={handleCopySelection}>
       <div className="table-scroll-shell" ref={scrollShellRef} onWheel={handleHorizontalWheel}>
         <div className="table-grid" style={tableGridStyle}>
           <div className="table-corner-cell" aria-hidden="true" />
@@ -541,14 +665,13 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
                   key={`cell-${rowIndex}-${colIndex}`}
                   className={`table-cell-wrapper ${
                     activeCell?.rowIndex === rowIndex && activeCell?.colIndex === colIndex ? "is-editing" : ""
-                  } ${cellContainsUrl(cell) ? "has-link" : ""}`}
+                  } ${cellContainsUrl(cell) ? "has-link" : ""} ${
+                    isCellInSelectionRange(rowIndex, colIndex, cellSelection) ? "is-selected" : ""
+                  }`}
                   style={{ height: `${tableData.rowHeights[rowIndex]}px` }}
-                  onMouseDown={(event) => {
-                    const target = event.target as HTMLElement;
-                    if (target.closest("a") || target.closest("textarea")) return;
-                    event.preventDefault();
-                    focusCell(rowIndex, colIndex);
-                  }}
+                  onPointerDown={(event) => startCellSelection(event, rowIndex, colIndex)}
+                  onPointerEnter={() => extendCellSelection(rowIndex, colIndex)}
+                  aria-selected={isCellInSelectionRange(rowIndex, colIndex, cellSelection)}
                 >
                   <div className="table-cell-display">{renderCellTextWithLinks(cell)}</div>
                   <textarea
@@ -560,7 +683,10 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
                     onChange={(event) => updateCellValue(rowIndex, colIndex, event.target.value)}
                     onKeyDown={(event) => handleCellKeyDown(event, rowIndex, colIndex)}
                     onPaste={(event) => handlePaste(event, rowIndex, colIndex)}
-                    onFocus={() => setActiveCell({ rowIndex, colIndex })}
+                    onFocus={() => {
+                      setCellSelection(null);
+                      setActiveCell({ rowIndex, colIndex });
+                    }}
                     onBlur={() => setActiveCell(null)}
                     spellCheck={false}
                     aria-label={`Cell ${getColumnLabel(colIndex)}${rowIndex + 1}`}
