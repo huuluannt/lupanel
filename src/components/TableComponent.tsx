@@ -13,6 +13,16 @@ interface TableComponentProps {
   onChange: (newValue: string) => void;
 }
 
+type CellPosition = {
+  rowIndex: number;
+  colIndex: number;
+};
+
+type PendingTableDelete = {
+  type: "row" | "column";
+  index: number;
+} | null;
+
 const DEFAULT_COL_WIDTH = 144;
 const DEFAULT_ROW_HEIGHT = 30;
 const DEFAULT_ROWS = 2;
@@ -175,10 +185,12 @@ const Icon = ({ type }: { type: "trash" | "left" | "right" | "up" | "down" }) =>
 
 const TableComponent = ({ value, onChange }: TableComponentProps) => {
   const [tableData, setTableData] = useState<TableData>(() => normalizeTableData(value));
-  const [activeCell, setActiveCell] = useState<{ rowIndex: number; colIndex: number } | null>(null);
+  const [activeCell, setActiveCell] = useState<CellPosition | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingTableDelete>(null);
   const lastPublishedValue = useRef(value);
   const scrollShellRef = useRef<HTMLDivElement>(null);
   const cellInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const pendingFocusRef = useRef<CellPosition | null>(null);
   const resizingState = useRef<{
     type: "col" | "row";
     index: number;
@@ -245,6 +257,46 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
     });
   };
 
+  const focusCellWhenReady = (rowIndex: number, colIndex: number) => {
+    pendingFocusRef.current = { rowIndex, colIndex };
+    setActiveCell({ rowIndex, colIndex });
+  };
+
+  useEffect(() => {
+    const pendingFocus = pendingFocusRef.current;
+    if (!pendingFocus) return;
+
+    const rowExists = pendingFocus.rowIndex >= 0 && pendingFocus.rowIndex < tableData.rows.length;
+    const colExists = pendingFocus.colIndex >= 0 && pendingFocus.colIndex < (tableData.rows[0]?.length ?? 0);
+    if (!rowExists || !colExists) return;
+
+    pendingFocusRef.current = null;
+    focusCell(pendingFocus.rowIndex, pendingFocus.colIndex);
+  }, [tableData]);
+
+  const ensureRowAndFocusCell = (rowIndex: number, colIndex: number) => {
+    if (rowIndex < tableData.rows.length) {
+      focusCell(rowIndex, colIndex);
+      return;
+    }
+
+    focusCellWhenReady(rowIndex, colIndex);
+    setTableData((current) => {
+      if (rowIndex < current.rows.length) return current;
+
+      const cols = current.rows[0]?.length ?? DEFAULT_COLS;
+      const rows = current.rows.map((row) => [...row]);
+      const rowHeights = [...current.rowHeights];
+
+      while (rows.length <= rowIndex) {
+        rows.push(Array.from({ length: cols }, () => ""));
+        rowHeights.push(DEFAULT_ROW_HEIGHT);
+      }
+
+      return { ...current, rows, rowHeights };
+    });
+  };
+
   const addRowAt = (index: number) => {
     setTableData((current) => {
       const cols = current.rows[0]?.length ?? DEFAULT_COLS;
@@ -260,6 +312,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
   };
 
   const removeRowAt = (index: number) => {
+    setActiveCell(null);
     setTableData((current) => {
       if (current.rows.length <= 1) return current;
       return {
@@ -280,6 +333,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
   };
 
   const removeColAt = (index: number) => {
+    setActiveCell(null);
     setTableData((current) => {
       if ((current.rows[0]?.length ?? 0) <= 1) return current;
       return {
@@ -288,6 +342,18 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
         colWidths: current.colWidths.filter((_, colIndex) => colIndex !== index),
       };
     });
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+
+    if (pendingDelete.type === "row") {
+      removeRowAt(pendingDelete.index);
+    } else {
+      removeColAt(pendingDelete.index);
+    }
+
+    setPendingDelete(null);
   };
 
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>, startRow: number, startCol: number) => {
@@ -323,6 +389,54 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
         rowHeights: normalizeSizeArray(current.rowHeights, targetRows, DEFAULT_ROW_HEIGHT, MIN_ROW_HEIGHT),
       };
     });
+  };
+
+  const handleCellKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+    rowIndex: number,
+    colIndex: number
+  ) => {
+    const arrowMoves: Record<string, { rowOffset: number; colOffset: number }> = {
+      ArrowLeft: { rowOffset: 0, colOffset: -1 },
+      ArrowRight: { rowOffset: 0, colOffset: 1 },
+      ArrowUp: { rowOffset: -1, colOffset: 0 },
+      ArrowDown: { rowOffset: 1, colOffset: 0 },
+    };
+    const arrowMove = arrowMoves[event.key];
+
+    if (arrowMove && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      const targetRow = rowIndex + arrowMove.rowOffset;
+      const targetCol = colIndex + arrowMove.colOffset;
+
+      if (targetRow >= 0 && targetRow < rowCount && targetCol >= 0 && targetCol < colCount) {
+        focusCell(targetRow, targetCol);
+      }
+
+      return;
+    }
+
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      ensureRowAndFocusCell(rowIndex + 1, colIndex);
+      return;
+    }
+
+    if (event.key === "Tab") {
+      event.preventDefault();
+
+      if (event.shiftKey) {
+        const targetRow = colIndex === 0 ? Math.max(0, rowIndex - 1) : rowIndex;
+        const targetCol = colIndex === 0 ? Math.max(0, colCount - 1) : colIndex - 1;
+        focusCell(targetRow, targetCol);
+        return;
+      }
+
+      const isLastColumn = colIndex >= colCount - 1;
+      const targetRow = isLastColumn ? rowIndex + 1 : rowIndex;
+      const targetCol = isLastColumn ? 0 : colIndex + 1;
+      ensureRowAndFocusCell(targetRow, targetCol);
+    }
   };
 
   const startResize = (type: "col" | "row", index: number, event: React.MouseEvent<HTMLDivElement>) => {
@@ -383,7 +497,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => removeColAt(colIndex)}
+                  onClick={() => setPendingDelete({ type: "column", index: colIndex })}
                   disabled={colCount <= 1}
                   title="Delete column"
                   aria-label="Delete column"
@@ -408,7 +522,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => removeRowAt(rowIndex)}
+                    onClick={() => setPendingDelete({ type: "row", index: rowIndex })}
                     disabled={rowCount <= 1}
                     title="Delete row"
                     aria-label="Delete row"
@@ -444,6 +558,7 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
                     className="table-cell-input"
                     value={cell}
                     onChange={(event) => updateCellValue(rowIndex, colIndex, event.target.value)}
+                    onKeyDown={(event) => handleCellKeyDown(event, rowIndex, colIndex)}
                     onPaste={(event) => handlePaste(event, rowIndex, colIndex)}
                     onFocus={() => setActiveCell({ rowIndex, colIndex })}
                     onBlur={() => setActiveCell(null)}
@@ -456,6 +571,27 @@ const TableComponent = ({ value, onChange }: TableComponentProps) => {
           ))}
         </div>
       </div>
+
+      {pendingDelete && (
+        <div className="component-confirm-backdrop" role="dialog" aria-modal="true">
+          <div className="component-confirm-modal">
+            <div className="component-confirm-title">
+              Delete this {pendingDelete.type === "row" ? "row" : "column"}?
+            </div>
+            <div className="component-confirm-desc">
+              This {pendingDelete.type === "row" ? "row" : "column"} and its cells will be removed from the table.
+            </div>
+            <div className="component-confirm-actions">
+              <button type="button" className="component-confirm-secondary" onClick={() => setPendingDelete(null)}>
+                Cancel
+              </button>
+              <button type="button" className="component-confirm-danger" onClick={confirmDelete}>
+                Delete {pendingDelete.type === "row" ? "row" : "column"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
