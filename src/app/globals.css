@@ -343,8 +343,59 @@ input, textarea {
   flex: 0 0 18px;
 }
 
+.mobile-component-menu-item {
+  display: none;
+}
+
 .dropdown-item:hover {
   background-color: var(--bg-hover-strong);
+}
+
+@media (max-width: 640px) {
+  .fixed-header {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .header-mode-panel .header-left {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .header-mode-panel .header-center {
+    display: none;
+  }
+
+  .header-mode-panel .header-logo-container,
+  .header-mode-panel .header-panel-label {
+    flex: 1;
+  }
+
+  .header-mode-panel .header-panel-name {
+    flex: 1 1 auto;
+  }
+
+  .header-mode-panel .header-right {
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+
+  .header-mode-panel .header-component-actions {
+    gap: 4px;
+  }
+
+  .header-mode-panel .header-quick-add-btn {
+    display: none;
+  }
+
+  .header-mode-panel .component-dropdown-menu {
+    left: auto;
+    right: 0;
+  }
+
+  .header-mode-panel .component-dropdown-menu .mobile-component-menu-item {
+    display: flex;
+  }
 }
 
 /* Account Info & Profile picture */
@@ -1971,17 +2022,16 @@ input, textarea {
   }
 }
 
-/* Component Row Controls (Notion-style drag/hover handles) */
+/* Component Row Controls */
 .component-row {
   position: relative;
-  padding: 4px 0 4px 28px;
-  group-hover: show;
+  padding: 4px 0 4px 12px;
 }
 
 .component-row.is-selected::before {
   content: "";
   position: absolute;
-  left: 10px;
+  left: 0;
   top: 8px;
   bottom: 8px;
   width: 2px;
@@ -2038,6 +2088,11 @@ input, textarea {
   margin-bottom: 6px;
 }
 
+.component-inner-title-field {
+  flex: 1;
+  min-width: 0;
+}
+
 .component-inner-title-input {
   flex: 1;
   min-width: 0;
@@ -2079,6 +2134,17 @@ input, textarea {
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.component-inner-title-row:hover .component-inner-remove-btn,
+.component-inner-title-row:focus-within .component-inner-remove-btn,
+.component-inner-richtext:hover .component-inner-richtext-remove-btn,
+.component-inner-richtext:focus-within .component-inner-richtext-remove-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .component-inner-remove-btn:hover {
@@ -2093,11 +2159,15 @@ input, textarea {
   right: 0;
 }
 
-.component-delete-btn {
+.component-more-control {
   position: absolute;
   right: 0;
   top: 50%;
   transform: translateY(-50%);
+  z-index: 30;
+}
+
+.component-more-btn {
   width: 34px;
   height: 34px;
   display: inline-flex;
@@ -2107,22 +2177,70 @@ input, textarea {
   border: 1px solid transparent;
   background-color: rgba(17, 24, 39, 0.04);
   color: var(--text-primary);
-  font-size: 14px;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   opacity: 0;
   pointer-events: none;
 }
 
-.component-row:hover .component-delete-btn {
+.component-row:hover .component-more-btn,
+.component-more-control:focus-within .component-more-btn,
+.component-more-control.is-open .component-more-btn {
   opacity: 1;
   pointer-events: auto;
 }
 
-.component-delete-btn:hover {
+.component-more-btn:hover,
+.component-more-control.is-open .component-more-btn {
   background-color: #111111;
   color: #ffffff;
   border-color: #111111;
+}
+
+.component-actions-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 31;
+  width: 124px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background-color: #ffffff;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
+}
+
+.component-actions-menu-item {
+  width: 100%;
+  height: 28px;
+  justify-content: flex-start;
+  padding: 0 9px;
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.component-actions-menu-item:hover {
+  background-color: var(--bg-hover-strong);
+}
+
+.component-actions-menu-item:disabled {
+  cursor: not-allowed;
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+
+.component-actions-menu-item.danger {
+  color: #dc2626;
+}
+
+.component-actions-menu-item.danger:hover {
+  color: #ffffff;
+  background-color: #111111;
 }
 
 .component-confirm-backdrop {
@@ -2343,53 +2461,6 @@ input, textarea {
   background-color: var(--bg-hover);
   border-color: var(--border-focus);
   color: var(--text-primary);
-}
-
-.component-controls {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.component-row:hover .component-controls {
-  opacity: 1;
-}
-
-.component-row:hover .component-control-btn {
-  background-color: #d4d4d8;
-  color: #111111;
-  border-color: transparent;
-}
-
-.component-control-btn {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  border-radius: 4px;
-  border: 1px solid transparent;
-  background-color: transparent;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.component-control-btn:hover {
-  background-color: #111111;
-  color: #ffffff;
-  border-color: #111111;
-}
-
-.component-control-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
 }
 
 /* Keyframes */

@@ -51,6 +51,7 @@ export default function CheckboxComponent({ value, onChange }: CheckboxComponent
   const initialItems = useMemo(() => normalizeCheckboxData(value).items, [value]);
   const [items, setItems] = useState<CheckboxItem[]>(initialItems);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<CheckboxItem | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const publishItems = (nextItems: CheckboxItem[]) => {
@@ -79,6 +80,12 @@ export default function CheckboxComponent({ value, onChange }: CheckboxComponent
 
   const deleteItem = (id: string) => {
     publishItems(items.filter((item) => item.id !== id));
+  };
+
+  const confirmDeleteItem = () => {
+    if (!pendingDeleteItem) return;
+    deleteItem(pendingDeleteItem.id);
+    setPendingDeleteItem(null);
   };
 
   const handleTextKeyDown = (event: React.KeyboardEvent<HTMLInputElement>, id: string) => {
@@ -127,7 +134,7 @@ export default function CheckboxComponent({ value, onChange }: CheckboxComponent
           <button
             type="button"
             className="checkbox-delete-row-btn"
-            onClick={() => deleteItem(item.id)}
+            onClick={() => setPendingDeleteItem(item)}
             aria-label="Delete checklist row"
             title="Delete row"
           >
@@ -135,6 +142,27 @@ export default function CheckboxComponent({ value, onChange }: CheckboxComponent
           </button>
         </div>
       ))}
+
+      {pendingDeleteItem && (
+        <div className="component-confirm-backdrop" role="dialog" aria-modal="true">
+          <div className="component-confirm-modal">
+            <div className="component-confirm-title">Delete this checkbox row?</div>
+            <div className="component-confirm-desc">This checklist row will be removed.</div>
+            <div className="component-confirm-actions">
+              <button
+                type="button"
+                className="component-confirm-secondary"
+                onClick={() => setPendingDeleteItem(null)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="component-confirm-danger" onClick={confirmDeleteItem}>
+                Delete row
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

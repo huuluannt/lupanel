@@ -94,7 +94,7 @@ export default function Header({
   }, [mode]);
 
   return (
-    <header className="fixed-header">
+    <header className={`fixed-header header-mode-${mode}`}>
       {/* LEFT AREA: Logo & Title */}
       <div className="header-left">
         <Link href="/" className="header-logo-container">
@@ -140,7 +140,7 @@ export default function Header({
           <div className="header-component-actions" ref={componentMenuRef}>
             <button
               type="button"
-              className="header-icon-btn"
+              className="header-icon-btn header-quick-add-btn"
               onClick={() => {
                 setShowComponentMenu(false);
                 onAddComponent("richtext");
@@ -157,7 +157,7 @@ export default function Header({
             </button>
             <button
               type="button"
-              className="header-icon-btn"
+              className="header-icon-btn header-quick-add-btn"
               onClick={() => {
                 setShowComponentMenu(false);
                 onAddComponent("gallery");
@@ -175,7 +175,7 @@ export default function Header({
             </button>
             <button
               type="button"
-              className="header-icon-btn"
+              className="header-icon-btn header-quick-add-btn"
               onClick={() => {
                 setShowComponentMenu(false);
                 onAddComponent("table");
@@ -199,6 +199,53 @@ export default function Header({
             
               {showComponentMenu && (
                 <div className="dropdown-menu component-dropdown-menu">
+                  <button
+                    className="dropdown-item mobile-component-menu-item"
+                    onClick={() => {
+                      onAddComponent("richtext");
+                      setShowComponentMenu(false);
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 7h16" />
+                      <path d="M4 12h10" />
+                      <path d="M4 17h8" />
+                      <path d="M17 14l3 3-3 3" />
+                    </svg>
+                    Rich Text
+                  </button>
+                  <button
+                    className="dropdown-item mobile-component-menu-item"
+                    onClick={() => {
+                      onAddComponent("gallery");
+                      setShowComponentMenu(false);
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                      <path d="M17.5 14v7" />
+                      <path d="M14 17.5h7" />
+                    </svg>
+                    Gallery
+                  </button>
+                  <button
+                    className="dropdown-item mobile-component-menu-item"
+                    onClick={() => {
+                      onAddComponent("table");
+                      setShowComponentMenu(false);
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <path d="M3 9h18" />
+                      <path d="M3 15h18" />
+                      <path d="M9 3v18" />
+                      <path d="M15 3v18" />
+                    </svg>
+                    Table
+                  </button>
                   <button
                     className="dropdown-item"
                     onClick={() => {

@@ -23,7 +23,7 @@ interface ComponentListProps {
   onMoveComponentDown: (id: string) => void;
   onUploadFile: (file: File) => Promise<string>;
   selectedComponentId: string | null;
-  onSelectComponent: (id: string) => void;
+  onSelectComponent: (id: string | null) => void;
 }
 
 const copyableComponentTypes = new Set<PanelComponent["type"]>(["title", "text", "richtext"]);
@@ -49,11 +49,17 @@ export default function ComponentList({
 }: ComponentListProps) {
   const componentRefs = useRef<Record<string, { focus?: () => void } | null>>({});
   const contentWrapperRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const copyStatusTimerRef = useRef<number | null>(null);
+  const actionMenuRef = useRef<HTMLDivElement | null>(null);
   const [pendingDeleteComponent, setPendingDeleteComponent] = useState<PanelComponent | null>(null);
+  const [pendingRemoveField, setPendingRemoveField] = useState<{
+    componentId: string;
+    field: "title" | "richText";
+  } | null>(null);
+  const [pendingTitleFocusId, setPendingTitleFocusId] = useState<string | null>(null);
   const [pendingRichTextFocusId, setPendingRichTextFocusId] = useState<string | null>(null);
   const [copiedComponentId, setCopiedComponentId] = useState<string | null>(null);
+  const [actionMenuComponentId, setActionMenuComponentId] = useState<string | null>(null);
 
   const handleFocusNext = (currentIndex: number) => {
     if (currentIndex + 1 < components.length) {
@@ -64,10 +70,8 @@ export default function ComponentList({
   };
 
   const handleAddTitle = (componentId: string) => {
+    setPendingTitleFocusId(componentId);
     onComponentTitleChange(componentId, "");
-    window.setTimeout(() => {
-      titleInputRefs.current[componentId]?.focus();
-    }, 0);
   };
 
   const handleAddRichText = (componentId: string) => {
@@ -148,6 +152,18 @@ export default function ComponentList({
     }
   };
 
+  const confirmRemoveField = () => {
+    if (!pendingRemoveField) return;
+
+    if (pendingRemoveField.field === "title") {
+      onComponentTitleChange(pendingRemoveField.componentId, undefined);
+    } else {
+      onComponentRichTextChange(pendingRemoveField.componentId, undefined);
+    }
+
+    setPendingRemoveField(null);
+  };
+
   useEffect(() => {
     return () => {
       if (copyStatusTimerRef.current) {
@@ -155,6 +171,42 @@ export default function ComponentList({
       }
     };
   }, []);
+
+  useEffect(() => {
+    const closeActionMenu = (event: PointerEvent) => {
+      if (!actionMenuRef.current?.contains(event.target as Node)) {
+        setActionMenuComponentId(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeActionMenu);
+    return () => document.removeEventListener("pointerdown", closeActionMenu);
+  }, []);
+
+  useEffect(() => {
+    const clearSelectionOnOutsidePointer = (event: PointerEvent) => {
+      if (!selectedComponentId || !(event.target instanceof Element)) return;
+
+      const shouldKeepSelection = event.target.closest(
+        [
+          ".component-row",
+          ".fixed-header",
+          ".dropdown-menu",
+          ".component-confirm-backdrop",
+          ".gallery-confirm-backdrop",
+          ".image-viewer-backdrop",
+          ".panel-form-backdrop",
+        ].join(", ")
+      );
+
+      if (!shouldKeepSelection) {
+        onSelectComponent(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", clearSelectionOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", clearSelectionOnOutsidePointer);
+  }, [onSelectComponent, selectedComponentId]);
 
   if (components.length === 0) {
     return (
@@ -173,29 +225,6 @@ export default function ComponentList({
           onFocusCapture={() => onSelectComponent(comp.id)}
           onMouseDown={() => onSelectComponent(comp.id)}
         >
-          <div className="component-controls">
-            <button
-              className="component-control-btn"
-              onClick={() => onMoveComponentUp(comp.id)}
-              title="Move up"
-              disabled={idx === 0}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M6 15l6-6 6 6" />
-              </svg>
-            </button>
-            <button
-              className="component-control-btn"
-              onClick={() => onMoveComponentDown(comp.id)}
-              title="Move down"
-              disabled={idx === components.length - 1}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-          </div>
-
           <div
             ref={(element) => {
               contentWrapperRefs.current[comp.id] = element;
@@ -247,19 +276,18 @@ export default function ComponentList({
 
             {comp.title !== undefined && (
               <div className="component-inner-title-row">
-                <input
-                  ref={(element) => {
-                    titleInputRefs.current[comp.id] = element;
-                  }}
-                  className="component-inner-title-input"
-                  value={comp.title}
-                  onChange={(event) => onComponentTitleChange(comp.id, event.target.value)}
-                  placeholder="Title"
-                />
+                <div className="component-inner-title-field">
+                  <TitleComponent
+                    value={comp.title}
+                    onChange={(val) => onComponentTitleChange(comp.id, val)}
+                    placeholder="Title"
+                    autoFocus={pendingTitleFocusId === comp.id}
+                  />
+                </div>
                 <button
                   type="button"
                   className="component-inner-remove-btn"
-                  onClick={() => onComponentTitleChange(comp.id, undefined)}
+                  onClick={() => setPendingRemoveField({ componentId: comp.id, field: "title" })}
                   aria-label="Remove title"
                   title="Remove title"
                 >
@@ -333,7 +361,7 @@ export default function ComponentList({
                 <button
                   type="button"
                   className="component-inner-remove-btn component-inner-richtext-remove-btn"
-                  onClick={() => onComponentRichTextChange(comp.id, undefined)}
+                  onClick={() => setPendingRemoveField({ componentId: comp.id, field: "richText" })}
                   aria-label="Remove rich text"
                   title="Remove rich text"
                 >
@@ -348,16 +376,96 @@ export default function ComponentList({
               </div>
             )}
 
-            <button
-              className="component-delete-btn"
-              onClick={() => setPendingDeleteComponent(comp)}
-              title="Delete component"
+            <div
+              ref={actionMenuComponentId === comp.id ? actionMenuRef : undefined}
+              className={`component-more-control ${actionMenuComponentId === comp.id ? "is-open" : ""}`}
             >
-              X
-            </button>
+              <button
+                type="button"
+                className="component-more-btn"
+                onClick={() => {
+                  setActionMenuComponentId((currentId) => (currentId === comp.id ? null : comp.id));
+                }}
+                aria-label="Component actions"
+                aria-expanded={actionMenuComponentId === comp.id}
+                title="Component actions"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="5" cy="12" r="1.8" />
+                  <circle cx="12" cy="12" r="1.8" />
+                  <circle cx="19" cy="12" r="1.8" />
+                </svg>
+              </button>
+
+              {actionMenuComponentId === comp.id && (
+                <div className="component-actions-menu" role="menu">
+                  <button
+                    type="button"
+                    className="component-actions-menu-item"
+                    onClick={() => {
+                      onMoveComponentUp(comp.id);
+                      setActionMenuComponentId(null);
+                    }}
+                    disabled={idx === 0}
+                    role="menuitem"
+                  >
+                    Move up
+                  </button>
+                  <button
+                    type="button"
+                    className="component-actions-menu-item"
+                    onClick={() => {
+                      onMoveComponentDown(comp.id);
+                      setActionMenuComponentId(null);
+                    }}
+                    disabled={idx === components.length - 1}
+                    role="menuitem"
+                  >
+                    Move down
+                  </button>
+                  <button
+                    type="button"
+                    className="component-actions-menu-item danger"
+                    onClick={() => {
+                      setPendingDeleteComponent(comp);
+                      setActionMenuComponentId(null);
+                    }}
+                    role="menuitem"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ))}
+
+      {pendingRemoveField && (
+        <div className="component-confirm-backdrop" role="dialog" aria-modal="true">
+          <div className="component-confirm-modal">
+            <div className="component-confirm-title">
+              Remove {pendingRemoveField.field === "title" ? "title" : "rich text"}?
+            </div>
+            <div className="component-confirm-desc">
+              This will remove only the extra {pendingRemoveField.field === "title" ? "title" : "rich text"} from this
+              component.
+            </div>
+            <div className="component-confirm-actions">
+              <button
+                type="button"
+                className="component-confirm-secondary"
+                onClick={() => setPendingRemoveField(null)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="component-confirm-danger" onClick={confirmRemoveField}>
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingDeleteComponent && (
         <div className="component-confirm-backdrop" role="dialog" aria-modal="true">

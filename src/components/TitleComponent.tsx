@@ -7,6 +7,7 @@ interface TitleComponentProps {
   onChange: (newValue: string) => void;
   placeholder?: string;
   onFocusNext?: () => void;
+  autoFocus?: boolean;
 }
 
 type TitleTheme = "default" | "color" | "pane";
@@ -61,11 +62,13 @@ export default function TitleComponent({
   onChange,
   placeholder = "Add Title...",
   onFocusNext,
+  autoFocus = false,
 }: TitleComponentProps) {
   const titleData = useMemo(() => normalizeTitleData(value), [value]);
   const [localValue, setLocalValue] = useState(titleData.text);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const editMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -122,6 +125,16 @@ export default function TitleComponent({
     };
   }, []);
 
+  useEffect(() => {
+    if (!autoFocus) return;
+
+    const timer = window.setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [autoFocus]);
+
   const updateTheme = (theme: TitleTheme) => {
     publishTitleData({ ...titleData, text: localValue, theme });
     setThemeMenuOpen(false);
@@ -136,6 +149,7 @@ export default function TitleComponent({
   return (
     <div className={`title-component-wrapper title-theme-${titleData.theme}`}>
       <input
+        ref={inputRef}
         type="text"
         className="title-input"
         placeholder={placeholder}
