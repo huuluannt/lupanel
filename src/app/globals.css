@@ -537,7 +537,28 @@ input, textarea {
 .panel-actions {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 8px;
+}
+
+.panel-copy-btn {
+  height: 24px;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background-color: var(--bg-primary);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.panel-copy-btn:hover,
+.panel-copy-btn.is-copied {
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
 }
 
 .panel-action-btn {
@@ -2221,7 +2242,7 @@ input, textarea {
   top: calc(100% + 6px);
   right: 0;
   z-index: 31;
-  width: 124px;
+  width: 148px;
   display: flex;
   flex-direction: column;
   gap: 2px;

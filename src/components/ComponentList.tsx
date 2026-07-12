@@ -231,46 +231,23 @@ export default function ComponentList({
             }}
             className="component-content-wrapper"
           >
-            {selectedComponentId === comp.id &&
-              ((comp.title === undefined && comp.type !== "title") ||
-                comp.richText === undefined ||
-                copyableComponentTypes.has(comp.type)) && (
+            {selectedComponentId === comp.id && copyableComponentTypes.has(comp.type) && (
               <div className="component-title-toolbar">
-                {comp.title === undefined && comp.type !== "title" && (
-                  <button
-                    type="button"
-                    className="component-title-toolbar-btn"
-                    onClick={() => handleAddTitle(comp.id)}
-                  >
-                    + Add Title
-                  </button>
-                )}
-                {comp.richText === undefined && (
-                  <button
-                    type="button"
-                    className="component-title-toolbar-btn"
-                    onClick={() => handleAddRichText(comp.id)}
-                  >
-                    + Add Rich Text
-                  </button>
-                )}
-                {copyableComponentTypes.has(comp.type) && (
-                  <button
-                    type="button"
-                    className="component-title-toolbar-btn"
-                    onMouseDown={(event) => {
-                      event.preventDefault();
+                <button
+                  type="button"
+                  className="component-title-toolbar-btn"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    void handleCopyMainContent(comp);
+                  }}
+                  onClick={(event) => {
+                    if (event.detail === 0) {
                       void handleCopyMainContent(comp);
-                    }}
-                    onClick={(event) => {
-                      if (event.detail === 0) {
-                        void handleCopyMainContent(comp);
-                      }
-                    }}
-                  >
-                    {copiedComponentId === comp.id ? "Copied" : "Copy"}
-                  </button>
-                )}
+                    }
+                  }}
+                >
+                  {copiedComponentId === comp.id ? "Copied" : "Copy"}
+                </button>
               </div>
             )}
 
@@ -399,6 +376,32 @@ export default function ComponentList({
 
               {actionMenuComponentId === comp.id && (
                 <div className="component-actions-menu" role="menu">
+                  {comp.title === undefined && comp.type !== "title" && (
+                    <button
+                      type="button"
+                      className="component-actions-menu-item"
+                      onClick={() => {
+                        handleAddTitle(comp.id);
+                        setActionMenuComponentId(null);
+                      }}
+                      role="menuitem"
+                    >
+                      Add Title
+                    </button>
+                  )}
+                  {comp.richText === undefined && (
+                    <button
+                      type="button"
+                      className="component-actions-menu-item"
+                      onClick={() => {
+                        handleAddRichText(comp.id);
+                        setActionMenuComponentId(null);
+                      }}
+                      role="menuitem"
+                    >
+                      Add Rich Text
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="component-actions-menu-item"

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { copyTextToClipboard, getPanelLink } from "../lib/share";
 import type { PanelComponent } from "../lib/storage";
 
 interface UserProfile {
@@ -39,10 +40,12 @@ export default function Header({
 }: HeaderProps) {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showComponentMenu, setShowComponentMenu] = useState(false);
+  const [copiedPanelLink, setCopiedPanelLink] = useState(false);
   
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const componentMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const copiedPanelTimerRef = useRef<number | null>(null);
 
   const renderHeaderTitle = () => {
     if (mode === "home") {
@@ -79,6 +82,14 @@ export default function Header({
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (copiedPanelTimerRef.current) {
+        window.clearTimeout(copiedPanelTimerRef.current);
+      }
+    };
+  }, []);
+
   // Keyboard shortcut '/' to focus search input
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -92,6 +103,25 @@ export default function Header({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [mode]);
+
+  const handleCopyPanelLink = async () => {
+    if (!panelCode) return;
+
+    try {
+      await copyTextToClipboard(getPanelLink(panelCode));
+      setCopiedPanelLink(true);
+
+      if (copiedPanelTimerRef.current) {
+        window.clearTimeout(copiedPanelTimerRef.current);
+      }
+
+      copiedPanelTimerRef.current = window.setTimeout(() => {
+        setCopiedPanelLink(false);
+      }, 1200);
+    } catch (error) {
+      console.error("Copy panel link failed", error);
+    }
+  };
 
   return (
     <header className={`fixed-header header-mode-${mode}`}>
@@ -380,7 +410,16 @@ export default function Header({
                     {user.email}
                   </div>
                 </div>
-                <button className="dropdown-item" onClick={onLogout} style={{ color: "#ef4444" }}>
+                {mode === "panel" && panelCode && (
+                  <button type="button" className="dropdown-item" onClick={() => void handleCopyPanelLink()}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.43" />
+                      <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.33-1.33" />
+                    </svg>
+                    {copiedPanelLink ? "Copied" : "Copy Link"}
+                  </button>
+                )}
+                <button type="button" className="dropdown-item" onClick={onLogout} style={{ color: "#ef4444" }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                     <polyline points="16 17 21 12 16 7"></polyline>

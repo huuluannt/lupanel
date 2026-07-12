@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "../components/Header";
 import LoginScreen from "../components/LoginScreen";
+import { copyTextToClipboard, getPanelLink } from "../lib/share";
 import { Panel, slugify, storageProvider } from "../lib/storage";
 import { auth, isFirebaseConfigured } from "../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -35,11 +36,14 @@ export default function Home() {
   const [panelFormOpen, setPanelFormOpen] = useState(false);
   const [panelFormMode, setPanelFormMode] = useState<PanelFormMode>("create");
   const [editingPanel, setEditingPanel] = useState<Panel | null>(null);
+  const [pendingDeletePanel, setPendingDeletePanel] = useState<Panel | null>(null);
+  const [copiedPanelId, setCopiedPanelId] = useState<string | null>(null);
   const [panelName, setPanelName] = useState("");
   const [panelCode, setPanelCode] = useState("");
   const [panelFormError, setPanelFormError] = useState<string | null>(null);
   const [panelListError, setPanelListError] = useState<string | null>(null);
   const panelBackdropMouseDownRef = useRef(false);
+  const copiedPanelTimerRef = useRef<number | null>(null);
 
   const fetchPanels = useCallback(async () => {
     try {
@@ -92,6 +96,14 @@ export default function Home() {
       });
     }
   }, [fetchPanels, user]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedPanelTimerRef.current) {
+        window.clearTimeout(copiedPanelTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleLoginSuccess = (profile: UserProfile) => {
     setUser(profile);
@@ -193,14 +205,39 @@ export default function Home() {
     }
   };
 
-  const handleDeletePanel = async (id: string, event: React.MouseEvent) => {
+  const handleCopyPanelLink = async (panel: Panel, event: React.MouseEvent) => {
     event.stopPropagation();
     event.preventDefault();
 
-    if (!window.confirm("Delete this panel? All content inside it will be permanently removed.")) return;
+    try {
+      await copyTextToClipboard(getPanelLink(panel.code));
+      setCopiedPanelId(panel.id);
+
+      if (copiedPanelTimerRef.current) {
+        window.clearTimeout(copiedPanelTimerRef.current);
+      }
+
+      copiedPanelTimerRef.current = window.setTimeout(() => {
+        setCopiedPanelId(null);
+      }, 1200);
+    } catch (error) {
+      console.error(error);
+      setPanelListError("Could not copy panel link.");
+    }
+  };
+
+  const handleDeletePanel = (panel: Panel, event: React.MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setPendingDeletePanel(panel);
+  };
+
+  const confirmDeletePanel = async () => {
+    if (!pendingDeletePanel) return;
 
     try {
-      await storageProvider.deletePanel(id);
+      await storageProvider.deletePanel(pendingDeletePanel.id);
+      setPendingDeletePanel(null);
       await fetchPanels();
     } catch (error) {
       console.error(error);
@@ -271,6 +308,19 @@ export default function Home() {
 
                 <div className="panel-actions">
                   <button
+                    type="button"
+                    className={`panel-copy-btn ${copiedPanelId === panel.id ? "is-copied" : ""}`}
+                    onClick={(event) => void handleCopyPanelLink(panel, event)}
+                    title="Copy panel link"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.43" />
+                      <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.33-1.33" />
+                    </svg>
+                    <span>{copiedPanelId === panel.id ? "Copied" : "Copy Link"}</span>
+                  </button>
+                  <button
+                    type="button"
                     className="component-control-btn panel-action-btn"
                     onClick={(event) => openEditPanel(panel, event)}
                     title="Edit panel"
@@ -281,8 +331,9 @@ export default function Home() {
                     </svg>
                   </button>
                   <button
+                    type="button"
                     className="component-control-btn panel-action-btn"
-                    onClick={(event) => handleDeletePanel(panel.id, event)}
+                    onClick={(event) => handleDeletePanel(panel, event)}
                     title="Delete panel"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -344,6 +395,29 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {pendingDeletePanel && (
+        <div className="component-confirm-backdrop" role="dialog" aria-modal="true">
+          <div className="component-confirm-modal">
+            <div className="component-confirm-title">Delete this panel?</div>
+            <div className="component-confirm-desc">
+              {pendingDeletePanel.name} and all content inside it will be permanently removed.
+            </div>
+            <div className="component-confirm-actions">
+              <button
+                type="button"
+                className="component-confirm-secondary"
+                onClick={() => setPendingDeletePanel(null)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="component-confirm-danger" onClick={() => void confirmDeletePanel()}>
+                Delete panel
+              </button>
+            </div>
           </div>
         </div>
       )}
