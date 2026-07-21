@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface UploadedFile {
   id: string;
@@ -19,6 +19,8 @@ interface FileComponentProps {
   value: string;
   onChange: (newValue: string) => void;
   onUploadFile: (file: File) => Promise<string>;
+  uploadTriggerToken?: number;
+  hideAddMoreButton?: boolean;
 }
 
 type FileKind = "word" | "excel" | "powerpoint" | "pdf" | "txt" | "photo" | "video" | "zip" | "other";
@@ -111,7 +113,13 @@ const normalizeFileData = (value: string): FileData => {
   }
 };
 
-export default function FileComponent({ value, onChange, onUploadFile }: FileComponentProps) {
+export default function FileComponent({
+  value,
+  onChange,
+  onUploadFile,
+  uploadTriggerToken,
+  hideAddMoreButton = false,
+}: FileComponentProps) {
   const [files, setFiles] = useState<UploadedFile[]>(() => normalizeFileData(value).files);
   const [dragActive, setDragActive] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
@@ -120,6 +128,7 @@ export default function FileComponent({ value, onChange, onUploadFile }: FileCom
 
   const filesRef = useRef(files);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadTriggerTokenRef = useRef(uploadTriggerToken);
 
   const publishFiles = (nextFiles: UploadedFile[]) => {
     filesRef.current = nextFiles;
@@ -162,6 +171,12 @@ export default function FileComponent({ value, onChange, onUploadFile }: FileCom
   const openFilePicker = () => {
     fileInputRef.current?.click();
   };
+
+  useEffect(() => {
+    if (uploadTriggerTokenRef.current === uploadTriggerToken) return;
+    uploadTriggerTokenRef.current = uploadTriggerToken;
+    fileInputRef.current?.click();
+  }, [uploadTriggerToken]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files?.length) {
@@ -247,10 +262,16 @@ export default function FileComponent({ value, onChange, onUploadFile }: FileCom
             );
           })}
 
-          <button type="button" className="file-add-more-btn" onClick={openFilePicker}>
-            {uploadingCount > 0 ? <span className="file-upload-spinner small" aria-hidden="true" /> : <span>+</span>}
-            <span>{uploadingCount > 0 ? `Uploading ${uploadingCount}...` : "Upload File"}</span>
-          </button>
+          {!hideAddMoreButton && (
+            <button type="button" className="file-add-more-btn" onClick={openFilePicker}>
+              {uploadingCount > 0 ? (
+                <span className="file-upload-spinner small" aria-hidden="true" />
+              ) : (
+                <span>+</span>
+              )}
+              <span>{uploadingCount > 0 ? `Uploading ${uploadingCount}...` : "Upload File"}</span>
+            </button>
+          )}
         </div>
       )}
 

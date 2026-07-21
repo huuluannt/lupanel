@@ -60,6 +60,7 @@ export default function ComponentList({
   const [pendingRichTextFocusId, setPendingRichTextFocusId] = useState<string | null>(null);
   const [copiedComponentId, setCopiedComponentId] = useState<string | null>(null);
   const [actionMenuComponentId, setActionMenuComponentId] = useState<string | null>(null);
+  const [fileUploadTriggerTokens, setFileUploadTriggerTokens] = useState<Record<string, number>>({});
 
   const handleFocusNext = (currentIndex: number) => {
     if (currentIndex + 1 < components.length) {
@@ -152,6 +153,13 @@ export default function ComponentList({
     }
   };
 
+  const handleUploadFileFromMenu = (componentId: string) => {
+    setFileUploadTriggerTokens((currentTokens) => ({
+      ...currentTokens,
+      [componentId]: (currentTokens[componentId] ?? 0) + 1,
+    }));
+  };
+
   const confirmRemoveField = () => {
     if (!pendingRemoveField) return;
 
@@ -231,26 +239,6 @@ export default function ComponentList({
             }}
             className="component-content-wrapper"
           >
-            {selectedComponentId === comp.id && copyableComponentTypes.has(comp.type) && (
-              <div className="component-title-toolbar">
-                <button
-                  type="button"
-                  className="component-title-toolbar-btn"
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    void handleCopyMainContent(comp);
-                  }}
-                  onClick={(event) => {
-                    if (event.detail === 0) {
-                      void handleCopyMainContent(comp);
-                    }
-                  }}
-                >
-                  {copiedComponentId === comp.id ? "Copied" : "Copy"}
-                </button>
-              </div>
-            )}
-
             {comp.title !== undefined && (
               <div className="component-inner-title-row">
                 <div className="component-inner-title-field">
@@ -314,6 +302,8 @@ export default function ComponentList({
                 value={comp.value}
                 onChange={(val) => onComponentChange(comp.id, val)}
                 onUploadFile={onUploadFile}
+                uploadTriggerToken={fileUploadTriggerTokens[comp.id] ?? 0}
+                hideAddMoreButton
               />
             )}
 
@@ -376,6 +366,31 @@ export default function ComponentList({
 
               {actionMenuComponentId === comp.id && (
                 <div className="component-actions-menu" role="menu">
+                  {copyableComponentTypes.has(comp.type) && (
+                    <button
+                      type="button"
+                      className="component-actions-menu-item"
+                      onClick={() => {
+                        void handleCopyMainContent(comp);
+                      }}
+                      role="menuitem"
+                    >
+                      {copiedComponentId === comp.id ? "Copied" : "Copy"}
+                    </button>
+                  )}
+                  {comp.type === "file" && (
+                    <button
+                      type="button"
+                      className="component-actions-menu-item"
+                      onClick={() => {
+                        handleUploadFileFromMenu(comp.id);
+                        setActionMenuComponentId(null);
+                      }}
+                      role="menuitem"
+                    >
+                      Upload File
+                    </button>
+                  )}
                   {comp.title === undefined && comp.type !== "title" && (
                     <button
                       type="button"
