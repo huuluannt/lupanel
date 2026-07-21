@@ -23,6 +23,7 @@ const TEXT_COLORS: Record<TextColor, string> = {
   red: "#dc2626",
   blue: "#2563eb",
 };
+const DEFAULT_TEXT_COLOR = "#18181b";
 
 const DEFAULT_FORMATS: ActiveFormats = {
   bold: false,
@@ -122,12 +123,16 @@ const sanitizeHtml = (html: string) => {
         const htmlElement = element as HTMLElement;
         const safeStyles: string[] = [];
         const textColor = getTextColor(htmlElement.style.color);
+        const fontWeight = htmlElement.style.fontWeight.trim().toLowerCase();
 
         if (isHighlightColor(htmlElement.style.backgroundColor)) {
           safeStyles.push("background-color: #fff299");
         }
         if (textColor) {
           safeStyles.push(`color: ${TEXT_COLORS[textColor]}`);
+        }
+        if (["bold", "600", "700", "800", "900"].includes(fontWeight)) {
+          safeStyles.push("font-weight: 700");
         }
 
         if (safeStyles.length > 0) {
@@ -137,6 +142,11 @@ const sanitizeHtml = (html: string) => {
         }
       }
     });
+
+    if (element.tagName === "FONT" && !element.hasAttribute("color") && !element.hasAttribute("style")) {
+      element.replaceWith(...Array.from(element.childNodes));
+      return;
+    }
 
     if (element.tagName === "A") {
       element.setAttribute("target", "_blank");
@@ -208,6 +218,13 @@ export default function RichTextComponent({
   };
 
   const updateActiveFormats = () => {
+    const selection = window.getSelection();
+    const editor = editorRef.current;
+    if (!selection || !editor || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) return;
+
     setActiveFormats({
       bold: document.queryCommandState("bold"),
       italic: document.queryCommandState("italic"),
@@ -228,21 +245,6 @@ export default function RichTextComponent({
     setIsToolbarVisible(true);
   }, []);
 
-  const runCommand = (command: string, commandValue?: string) => {
-    focusEditor();
-    document.execCommand(command, false, commandValue);
-    updateActiveFormats();
-    schedulePublish();
-  };
-
-  const toggleHighlight = () => {
-    runCommand("backColor", activeFormats.highlight ? "transparent" : "#fff299");
-  };
-
-  const applyTextColor = (color: TextColor) => {
-    runCommand("foreColor", TEXT_COLORS[color]);
-  };
-
   const saveCurrentSelection = () => {
     const selection = window.getSelection();
     const editor = editorRef.current;
@@ -262,6 +264,34 @@ export default function RichTextComponent({
 
     selection.removeAllRanges();
     selection.addRange(savedSelectionRef.current);
+  };
+
+  const runCommand = (command: string, commandValue?: string) => {
+    focusEditor();
+    restoreSavedSelection();
+    document.execCommand(command, false, commandValue);
+    saveCurrentSelection();
+    updateActiveFormats();
+    schedulePublish();
+  };
+
+  const toggleHighlight = () => {
+    focusEditor();
+    restoreSavedSelection();
+    const isActive = isHighlightColor(String(document.queryCommandValue("backColor")));
+    runCommand("backColor", isActive ? "transparent" : "#fff299");
+  };
+
+  const toggleTextColor = (color: TextColor) => {
+    focusEditor();
+    restoreSavedSelection();
+    const isActive = getTextColor(String(document.queryCommandValue("foreColor"))) === color;
+    runCommand("foreColor", isActive ? DEFAULT_TEXT_COLOR : TEXT_COLORS[color]);
+  };
+
+  const handleToolbarMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    saveCurrentSelection();
+    event.preventDefault();
   };
 
   const openLinkDialog = () => {
@@ -352,8 +382,14 @@ export default function RichTextComponent({
   };
 
   const handleInput = () => {
+    saveCurrentSelection();
     updateActiveFormats();
     schedulePublish();
+  };
+
+  const handleEditorSelectionChange = () => {
+    saveCurrentSelection();
+    updateActiveFormats();
   };
 
   const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
@@ -443,7 +479,7 @@ export default function RichTextComponent({
       onBlurCapture={handleWrapperBlur}
       onMouseDown={showToolbar}
     >
-      <div className="richtext-toolbar" onMouseDown={(event) => event.preventDefault()}>
+      <div className="richtext-toolbar" onMouseDown={handleToolbarMouseDown}>
         <button
           type="button"
           className={`richtext-tool-btn ${activeFormats.bold ? "active" : ""}`}
@@ -479,7 +515,7 @@ export default function RichTextComponent({
         <button
           type="button"
           className={`richtext-tool-btn text-color text-color-red ${activeFormats.textColor === "red" ? "active" : ""}`}
-          onClick={() => applyTextColor("red")}
+          onClick={() => toggleTextColor("red")}
           aria-label="Text color red"
           title="Text color: red"
         >
@@ -488,7 +524,7 @@ export default function RichTextComponent({
         <button
           type="button"
           className={`richtext-tool-btn text-color text-color-blue ${activeFormats.textColor === "blue" ? "active" : ""}`}
-          onClick={() => applyTextColor("blue")}
+          onClick={() => toggleTextColor("blue")}
           aria-label="Text color blue"
           title="Text color: blue"
         >
@@ -536,9 +572,9 @@ export default function RichTextComponent({
         data-placeholder={placeholder}
         suppressContentEditableWarning
         onInput={handleInput}
-        onKeyUp={updateActiveFormats}
+        onKeyUp={handleEditorSelectionChange}
         onKeyDown={handleKeyDown}
-        onMouseUp={updateActiveFormats}
+        onMouseUp={handleEditorSelectionChange}
         onClick={handleEditorClick}
         onPaste={handlePaste}
         onBlur={handleBlur}

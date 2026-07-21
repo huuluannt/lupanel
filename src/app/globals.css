@@ -1015,6 +1015,11 @@ input, textarea {
   text-underline-offset: 2px;
 }
 
+.richtext-editor b,
+.richtext-editor strong {
+  font-weight: 700;
+}
+
 .richtext-editor ul,
 .richtext-editor ol {
   padding-left: 20px;

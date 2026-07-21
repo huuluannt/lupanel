@@ -76,25 +76,6 @@ const normalizePanel = (panel: Partial<Panel>, fallbackId = ""): Panel => {
   };
 };
 
-const createDefaultPanelComponents = (): PanelComponent[] => {
-  const timestamp = Date.now();
-
-  return [
-    {
-      id: `title-${timestamp}`,
-      type: "title",
-      value: "",
-      order: 0,
-    },
-    {
-      id: `richtext-${timestamp}`,
-      type: "richtext",
-      value: "",
-      order: 1,
-    },
-  ];
-};
-
 // Unified storage provider
 export const storageProvider = {
   // --- PANELS ---
@@ -155,10 +136,6 @@ export const storageProvider = {
         const batch = writeBatch(db);
         batch.set(docRef, newPanel);
 
-        createDefaultPanelComponents().forEach((component) => {
-          batch.set(doc(firestore, "panels", id, "components", component.id), component);
-        });
-
         await batch.commit();
         return newPanel;
       } catch (e) {
@@ -176,7 +153,7 @@ export const storageProvider = {
       }
       list.push(newPanel);
       localStorage.setItem("lupanel_panels", JSON.stringify(list));
-      localStorage.setItem(`lupanel_components_${id}`, JSON.stringify(createDefaultPanelComponents()));
+      localStorage.setItem(`lupanel_components_${id}`, "[]");
       return newPanel;
     }
 
