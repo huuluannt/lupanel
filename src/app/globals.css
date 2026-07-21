@@ -928,6 +928,46 @@ input, textarea {
   border-color: #f7d46a;
 }
 
+.richtext-tool-btn.text-color {
+  position: relative;
+  padding-bottom: 3px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.richtext-tool-btn.text-color::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  bottom: 3px;
+  left: 7px;
+  height: 2px;
+  border-radius: 1px;
+  background-color: currentColor;
+}
+
+.richtext-tool-btn.text-color-red,
+.richtext-tool-btn.text-color-red:hover,
+.richtext-tool-btn.text-color-red.active {
+  color: #dc2626;
+}
+
+.richtext-tool-btn.text-color-blue,
+.richtext-tool-btn.text-color-blue:hover,
+.richtext-tool-btn.text-color-blue.active {
+  color: #2563eb;
+}
+
+.richtext-tool-btn.text-color-red.active {
+  border-color: #fecaca;
+  background-color: #fef2f2;
+}
+
+.richtext-tool-btn.text-color-blue.active {
+  border-color: #bfdbfe;
+  background-color: #eff6ff;
+}
+
 .richtext-tool-btn.link svg {
   width: 13px;
   height: 13px;

@@ -14,13 +14,36 @@ interface ActiveFormats {
   italic: boolean;
   underline: boolean;
   highlight: boolean;
+  textColor: TextColor | null;
 }
+
+type TextColor = "red" | "blue";
+
+const TEXT_COLORS: Record<TextColor, string> = {
+  red: "#dc2626",
+  blue: "#2563eb",
+};
 
 const DEFAULT_FORMATS: ActiveFormats = {
   bold: false,
   italic: false,
   underline: false,
   highlight: false,
+  textColor: null,
+};
+
+const normalizeCssColor = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "");
+
+const getTextColor = (value: string): TextColor | null => {
+  const normalizedColor = normalizeCssColor(value);
+
+  if (["#dc2626", "rgb(220,38,38)", "rgba(220,38,38,1)"].includes(normalizedColor)) return "red";
+  if (["#2563eb", "rgb(37,99,235)", "rgba(37,99,235,1)"].includes(normalizedColor)) return "blue";
+  return null;
+};
+
+const isHighlightColor = (value: string) => {
+  return ["#fff299", "rgb(255,242,153)", "rgba(255,242,153,1)"].includes(normalizeCssColor(value));
 };
 
 const URL_BEFORE_CARET_PATTERN =
@@ -48,8 +71,23 @@ const sanitizeHtml = (html: string) => {
 
   const template = document.createElement("template");
   template.innerHTML = html;
-  const allowedTags = new Set(["A", "B", "BR", "DIV", "EM", "I", "LI", "OL", "P", "SPAN", "STRONG", "U", "UL"]);
-  const allowedAttrs = new Set(["href", "target", "rel", "style"]);
+  const allowedTags = new Set([
+    "A",
+    "B",
+    "BR",
+    "DIV",
+    "EM",
+    "FONT",
+    "I",
+    "LI",
+    "OL",
+    "P",
+    "SPAN",
+    "STRONG",
+    "U",
+    "UL",
+  ]);
+  const allowedAttrs = new Set(["color", "href", "target", "rel", "style"]);
 
   template.content.querySelectorAll("*").forEach((element) => {
     if (!allowedTags.has(element.tagName)) {
@@ -71,8 +109,32 @@ const sanitizeHtml = (html: string) => {
         }
       }
 
-      if (name === "style" && !attr.value.includes("background-color: rgb(255, 242, 153)")) {
-        element.removeAttribute(attr.name);
+      if (name === "color") {
+        const textColor = element.tagName === "FONT" ? getTextColor(attr.value) : null;
+        if (textColor) {
+          element.setAttribute("color", TEXT_COLORS[textColor]);
+        } else {
+          element.removeAttribute(attr.name);
+        }
+      }
+
+      if (name === "style") {
+        const htmlElement = element as HTMLElement;
+        const safeStyles: string[] = [];
+        const textColor = getTextColor(htmlElement.style.color);
+
+        if (isHighlightColor(htmlElement.style.backgroundColor)) {
+          safeStyles.push("background-color: #fff299");
+        }
+        if (textColor) {
+          safeStyles.push(`color: ${TEXT_COLORS[textColor]}`);
+        }
+
+        if (safeStyles.length > 0) {
+          element.setAttribute("style", safeStyles.join("; "));
+        } else {
+          element.removeAttribute(attr.name);
+        }
       }
     });
 
@@ -150,9 +212,8 @@ export default function RichTextComponent({
       bold: document.queryCommandState("bold"),
       italic: document.queryCommandState("italic"),
       underline: document.queryCommandState("underline"),
-      highlight: ["rgb(255, 242, 153)", "#fff299"].includes(
-        String(document.queryCommandValue("backColor")).toLowerCase()
-      ),
+      highlight: isHighlightColor(String(document.queryCommandValue("backColor"))),
+      textColor: getTextColor(String(document.queryCommandValue("foreColor"))),
     });
   };
 
@@ -176,6 +237,10 @@ export default function RichTextComponent({
 
   const toggleHighlight = () => {
     runCommand("backColor", activeFormats.highlight ? "transparent" : "#fff299");
+  };
+
+  const applyTextColor = (color: TextColor) => {
+    runCommand("foreColor", TEXT_COLORS[color]);
   };
 
   const saveCurrentSelection = () => {
@@ -410,6 +475,24 @@ export default function RichTextComponent({
           title="Highlight yellow"
         >
           H
+        </button>
+        <button
+          type="button"
+          className={`richtext-tool-btn text-color text-color-red ${activeFormats.textColor === "red" ? "active" : ""}`}
+          onClick={() => applyTextColor("red")}
+          aria-label="Text color red"
+          title="Text color: red"
+        >
+          A
+        </button>
+        <button
+          type="button"
+          className={`richtext-tool-btn text-color text-color-blue ${activeFormats.textColor === "blue" ? "active" : ""}`}
+          onClick={() => applyTextColor("blue")}
+          aria-label="Text color blue"
+          title="Text color: blue"
+        >
+          A
         </button>
         <button type="button" className="richtext-tool-btn link" onClick={openLinkDialog} title="Link URL">
           <svg viewBox="0 0 16 16" aria-hidden="true">
